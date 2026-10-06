@@ -1,0 +1,1 @@
+window.URBANPULSE_MAPBOX_TOKEN = '';

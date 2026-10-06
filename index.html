@@ -1,0 +1,2478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CascadeIQ — Pune Urban Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="./mapbox-config.js"></script>
+<style>
+/* ── TOKENS ───────────────────────────────────────────── */
+:root {
+  --bg:        #F6FAF8;
+  --surface:   #FFFFFF;
+  --border:    #DCE9E3;
+  --border-2:  #C8DDD5;
+
+  --accent:    #1A7A5E;
+  --accent-lt: #EAF5F0;
+  --accent-md: #C2E0D4;
+
+  --danger:    #C0392B;
+  --danger-lt: #FDECEA;
+  --high:      #C05621;
+  --high-lt:   #FEF0E7;
+  --amber:     #9A6A00;
+  --amber-lt:  #FEF7E0;
+  --safe:      #1A6B3A;
+  --safe-lt:   #E8F5EE;
+
+  --tx:        #182B24;
+  --tx2:       #4D7066;
+  --tx3:       #8AADA4;
+
+  --mono:      'IBM Plex Mono', monospace;
+  --sans:      'Outfit', sans-serif;
+
+  --sidebar:   308px;
+  --topbar:    46px;
+  --strip:     56px;
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+
+html,body {
+  height:100%; background:var(--bg);
+  color:var(--tx); font-family:var(--sans);
+  font-size:13px; line-height:1.5; overflow:hidden;
+}
+
+/* ── SHELL ────────────────────────────────────────────── */
+.shell { display:grid; grid-template-rows:var(--topbar) 1fr; height:100vh; }
+
+/* ── TOPBAR ───────────────────────────────────────────── */
+.topbar {
+  display:flex; align-items:center; gap:0;
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:0 16px; position:relative; z-index:90;
+}
+.brand { display:flex; align-items:center; gap:9px; margin-right:20px; }
+.brand-mark {
+  width:26px; height:26px; border-radius:6px;
+  background:var(--accent); display:flex; align-items:center;
+  justify-content:center; font-size:13px; flex-shrink:0;
+  color:#fff; font-weight:700;
+}
+.brand-name { font-size:14px; font-weight:700; color:var(--tx); letter-spacing:-0.01em; }
+.brand-city { font-size:11px; color:var(--tx3); font-weight:400; margin-left:4px; }
+
+.topbar-divider { width:1px; height:26px; background:var(--border); margin:0 16px; }
+
+/* Alert strip in topbar */
+.alert-strip {
+  display:flex; align-items:center; gap:8px; flex:1;
+}
+.alert-pill {
+  display:flex; align-items:center; gap:6px;
+  padding:3px 10px; border-radius:4px;
+  font-size:11px; font-weight:600;
+  border:1px solid; cursor:pointer;
+}
+.alert-pill.high   { background:var(--high-lt);   color:var(--high);   border-color:#F4C5AB; }
+.alert-pill.danger { background:var(--danger-lt);  color:var(--danger); border-color:#F5C6C2; }
+.alert-pill.safe   { background:var(--safe-lt);    color:var(--safe);   border-color:#B8DEC8; }
+.alert-pill.amber  { background:var(--amber-lt);   color:var(--amber);  border-color:#F0D898; }
+.apill-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.apill-dot.pulse { animation:dot-pulse 2s infinite; }
+@keyframes dot-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.alert-text { font-size:12px; color:var(--tx2); }
+.alert-text b { color:var(--tx); font-weight:600; }
+
+.topbar-right { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.source-row { display:flex; align-items:center; gap:6px; }
+.src-dot { width:7px; height:7px; border-radius:50%; }
+.src-dot.ok     { background:var(--safe); }
+.src-dot.stale  { background:var(--amber); }
+.src-dot.down   { background:var(--danger); }
+.src-label { font-size:10px; color:var(--tx3); font-family:var(--mono); }
+.topbar-time { font-size:11px; color:var(--tx3); font-family:var(--mono); }
+
+.mode-toggle {
+  display:flex; border:1px solid var(--border); border-radius:5px; overflow:hidden;
+}
+.mode-btn {
+  padding:4px 10px; font-size:11px; font-weight:500;
+  cursor:pointer; color:var(--tx2); border:none; background:none;
+  font-family:var(--sans); transition:background 0.12s;
+}
+.mode-btn.active { background:var(--accent); color:#fff; }
+
+/* ── CONTENT ──────────────────────────────────────────── */
+.content { display:flex; height:calc(100vh - var(--topbar)); overflow:hidden; }
+
+/* ── SIDEBAR ──────────────────────────────────────────── */
+.sidebar {
+  width:var(--sidebar); flex-shrink:0;
+  background:var(--surface); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.sidebar-nav {
+  display:flex; border-bottom:1px solid var(--border);
+}
+.snav-tab {
+  flex:1; padding:10px 0; text-align:center;
+  font-size:11px; font-weight:600; cursor:pointer;
+  color:var(--tx3); border-bottom:2px solid transparent;
+  transition:color 0.12s; user-select:none;
+}
+.snav-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+.sidebar-body { flex:1; overflow-y:auto; padding:0 0 12px; }
+.sidebar-body::-webkit-scrollbar { width:3px; }
+.sidebar-body::-webkit-scrollbar-thumb { background:var(--border-2); border-radius:2px; }
+
+/* Sidebar sections */
+.s-section { border-bottom:1px solid var(--border); }
+.s-section-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:11px 14px; cursor:pointer; user-select:none;
+}
+.s-section-title { font-size:11px; font-weight:600; color:var(--tx); letter-spacing:0.01em; }
+.s-section-chevron { font-size:10px; color:var(--tx3); transition:transform 0.18s; }
+.s-section-chevron.open { transform:rotate(180deg); }
+.s-section-body { padding:0 14px 12px; display:none; }
+.s-section-body.open { display:block; }
+
+/* Layer toggles (TerraPrinter style) */
+.layer-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:7px 0; border-bottom:1px solid var(--border);
+}
+.layer-item:last-child { border-bottom:none; }
+.layer-info { display:flex; flex-direction:column; gap:1px; }
+.layer-name { font-size:12px; color:var(--tx); font-weight:500; }
+.layer-desc { font-size:10px; color:var(--tx3); line-height:1.4; max-width:180px; }
+
+/* Toggle switch */
+.toggle { position:relative; width:34px; height:18px; flex-shrink:0; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-track {
+  position:absolute; inset:0; border-radius:9px;
+  background:var(--border-2); cursor:pointer; transition:background 0.18s;
+}
+.toggle input:checked + .toggle-track { background:var(--accent); }
+.toggle-thumb {
+  position:absolute; top:2px; left:2px;
+  width:14px; height:14px; border-radius:50%;
+  background:#fff; transition:transform 0.18s;
+  pointer-events:none;
+  box-shadow:0 1px 3px rgba(0,0,0,0.18);
+}
+.toggle input:checked ~ .toggle-thumb { transform:translateX(16px); }
+
+/* Radio group (basemap selector) */
+.radio-group { display:flex; gap:0; border:1px solid var(--border); border-radius:5px; overflow:hidden; margin-bottom:10px; }
+.radio-btn {
+  flex:1; padding:6px 0; text-align:center; font-size:11px; font-weight:500;
+  cursor:pointer; color:var(--tx2); border-right:1px solid var(--border);
+  background:none; transition:background 0.12s;
+}
+.radio-btn:last-child { border-right:none; }
+.radio-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+/* Stat row in sidebar */
+.stat-row {
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding:6px 0; border-bottom:1px solid var(--border);
+}
+.stat-row:last-child { border-bottom:none; }
+.stat-label { font-size:11px; color:var(--tx2); }
+.stat-val   { font-size:13px; font-weight:600; font-family:var(--mono); }
+.stat-val.danger { color:var(--danger); }
+.stat-val.high   { color:var(--high); }
+.stat-val.amber  { color:var(--amber); }
+.stat-val.safe   { color:var(--safe); }
+.stat-unit { font-size:10px; font-weight:400; color:var(--tx3); margin-left:2px; }
+
+/* Sidebar action items */
+.action-list { display:flex; flex-direction:column; gap:6px; }
+.action-item {
+  padding:8px 10px; border-radius:5px;
+  font-size:11px; color:var(--tx2); line-height:1.5;
+  border-left:2px solid; background:var(--bg);
+}
+.action-item.danger { border-color:var(--danger); background:var(--danger-lt); color:#7A1F18; }
+.action-item.high   { border-color:var(--high);   background:var(--high-lt);   color:#7A3810; }
+.action-item.amber  { border-color:var(--amber);   background:var(--amber-lt);  color:#5C4200; }
+.action-item.info   { border-color:var(--accent);  background:var(--accent-lt); color:#0F4D38; }
+
+/* Cascade chain in sidebar */
+.cascade-mini {
+  background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px;
+}
+.cm-prob { font-size:22px; font-weight:700; font-family:var(--mono); color:var(--high); }
+.cm-label { font-size:10px; color:var(--tx3); }
+.cm-chain { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; align-items:center; }
+.cm-node {
+  font-size:10px; padding:2px 7px; border-radius:3px; font-weight:500;
+}
+.cm-node.done   { background:var(--danger-lt); color:var(--danger); }
+.cm-node.active { background:var(--high-lt);   color:var(--high); }
+.cm-node.next   { background:var(--bg); color:var(--tx3); border:1px solid var(--border); }
+.cm-arr { font-size:10px; color:var(--tx3); }
+
+/* Bottom nav items */
+.sidebar-footer { border-top:1px solid var(--border); }
+.nav-item {
+  display:flex; align-items:center; gap:9px;
+  padding:9px 14px; cursor:pointer; color:var(--tx2);
+  font-size:12px; font-weight:500; border-bottom:1px solid var(--border);
+  transition:background 0.1s; user-select:none;
+}
+.nav-item:last-child { border-bottom:none; }
+.nav-item:hover { background:var(--bg); color:var(--tx); }
+.nav-item.active { background:var(--accent-lt); color:var(--accent); }
+.nav-icon { font-size:14px; width:18px; text-align:center; flex-shrink:0; }
+.nav-badge {
+  margin-left:auto; font-size:10px; font-family:var(--mono);
+  padding:1px 5px; border-radius:3px; font-weight:500;
+}
+.nav-badge.red    { background:var(--danger-lt); color:var(--danger); }
+.nav-badge.green  { background:var(--safe-lt);   color:var(--safe); }
+.nav-badge.orange { background:var(--high-lt);   color:var(--high); }
+
+/* ── MAIN ─────────────────────────────────────────────── */
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+/* ── PAGES ────────────────────────────────────────────── */
+.page { display:none; flex:1; overflow:hidden; flex-direction:column; }
+.page.active { display:flex; }
+
+/* ── STATUS STRIP ─────────────────────────────────────── */
+.status-strip {
+  height:var(--strip); background:var(--surface);
+  border-top:1px solid var(--border);
+  display:flex; overflow-x:auto; flex-shrink:0;
+}
+.status-strip::-webkit-scrollbar { display:none; }
+.sc {
+  display:flex; align-items:center; gap:8px;
+  padding:0 16px; border-right:1px solid var(--border);
+  cursor:pointer; min-width:max-content; transition:background 0.1s;
+}
+.sc:hover { background:var(--bg); }
+.sc:last-child { border-right:none; }
+.sc-icon { font-size:17px; }
+.sc-data { display:flex; flex-direction:column; gap:0; }
+.sc-label { font-size:10px; color:var(--tx3); font-weight:500; }
+.sc-value { font-size:13px; font-weight:700; font-family:var(--mono); line-height:1.15; }
+.sc-trend { font-size:10px; font-family:var(--mono); }
+.sc-value.danger,.sc-trend.danger { color:var(--danger); }
+.sc-value.high,  .sc-trend.high   { color:var(--high); }
+.sc-value.amber, .sc-trend.amber  { color:var(--amber); }
+.sc-value.safe,  .sc-trend.safe   { color:var(--safe); }
+.sc-value.accent,.sc-trend.accent { color:var(--accent); }
+
+/* ─────────────────────────────────────────────────────── */
+/*  PAGE 1 — PUNE TODAY (3D MAP)                          */
+/* ─────────────────────────────────────────────────────── */
+#page-home .home-body {
+  flex:1; display:grid;
+  grid-template-columns: 1fr;
+  overflow:hidden; position:relative;
+}
+
+/* MAP VIEWPORT */
+.map-viewport {
+  position:relative; overflow:hidden;
+  background:linear-gradient(180deg, #C8DCF0 0%, #D8EBDA 35%, #CCDEC8 60%, #B8D4B0 100%);
+}
+
+.map-3d-wrap { position:absolute; inset:0; overflow:hidden; }
+
+
+
+
+/* ── PUNE SVG MAP ── */
+.pune-svg { width:100%; height:100%; }
+
+/* Mapbox overrides */
+#map .mapboxgl-canvas { border-radius: 0; }
+#map .mapboxgl-ctrl-bottom-left, #map .mapboxgl-ctrl-bottom-right { z-index: 5; }
+.map-3d-scene { position:absolute; inset:0; }
+
+
+/* Building rise-up animation */
+@keyframes bldg-rise {
+  from { transform:scaleY(0); opacity:0; }
+  to   { transform:scaleY(1); opacity:1; }
+}
+.bldg {
+  transform-origin:bottom center;
+  animation:bldg-rise 0.6s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+/* River flow animation */
+@keyframes river-flow {
+  0%   { stroke-dashoffset:40; }
+  100% { stroke-dashoffset:0; }
+}
+.river-animated {
+  stroke-dasharray:20,20;
+  animation:river-flow 3s linear infinite;
+}
+
+/* Rain particles animation */
+@keyframes rain-fall {
+  0%   { transform:translateY(-20px); opacity:0; }
+  20%  { opacity:0.6; }
+  100% { transform:translateY(40px); opacity:0; }
+}
+.rain-particle { animation:rain-fall 1.2s linear infinite; }
+.rain-overlay { display:none; }
+.rain-overlay.active { display:block; }
+
+/* Simulate flash effect */
+@keyframes flash-danger {
+  0%,100% { background:transparent; }
+  50%     { background:rgba(192,57,43,0.04); }
+}
+.flash-danger { animation:flash-danger 0.6s ease 2; }
+
+/* Map controls (TerraPrinter style) */
+.map-controls-panel {
+  position:absolute; top:12px; right:12px; z-index:20;
+  display:flex; flex-direction:column; gap:4px;
+}
+.map-ctrl-btn {
+  width:32px; height:32px; border-radius:5px;
+  background:var(--surface); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-size:15px; color:var(--tx2);
+  box-shadow:0 1px 3px rgba(0,0,0,0.08); transition:background 0.12s;
+}
+.map-ctrl-btn:hover { background:var(--bg); color:var(--tx); }
+.map-ctrl-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+/* Coord readout (TerraPrinter style) */
+.map-coords {
+  position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+  background:rgba(24,43,36,0.88);; color:#C8E8DC;
+  padding:4px 14px; border-radius:4px; font-size:11px;
+  font-family:var(--mono); z-index:20; white-space:nowrap;
+  backdrop-filter:blur(4px);
+}
+.map-coords span { color:#6ABFA0; margin:0 8px; }
+
+/* Hazard legend */
+.map-legend {
+  position:absolute; bottom:38px; left:12px; z-index:20;
+  background:rgba(255,255,255,0.94); border:1px solid var(--border);
+  border-radius:6px; padding:9px 12px;
+  backdrop-filter:blur(4px); min-width:150px;
+}
+.ml-title { font-size:10px; font-weight:600; color:var(--tx3); margin-bottom:7px; }
+.ml-row { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+.ml-row:last-child { margin-bottom:0; }
+.ml-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+.ml-label { font-size:11px; color:var(--tx2); }
+.ml-val { margin-left:auto; font-size:11px; font-family:var(--mono); font-weight:600; }
+
+/* Ward tooltip */
+.ward-tooltip {
+  position:absolute; z-index:30; pointer-events:none;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; padding:10px 12px; min-width:170px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.12);
+  opacity:0; transition:opacity 0.15s;
+}
+.ward-tooltip.visible { opacity:1; }
+.wt-name { font-size:12px; font-weight:600; color:var(--tx); margin-bottom:6px; }
+.wt-row  { display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; }
+.wt-label { color:var(--tx3); }
+.wt-val   { font-family:var(--mono); font-weight:500; }
+
+/* Cascade active badge on map */
+.cascade-badge {
+  position:absolute; top:12px; left:12px; z-index:20;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; padding:10px 12px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.08); max-width:240px;
+}
+.cb-label { font-size:10px; color:var(--tx3); margin-bottom:4px; }
+.cb-main { font-size:13px; font-weight:600; color:var(--tx); line-height:1.3; }
+.cb-prob {
+  display:inline-block; margin-top:6px;
+  font-size:11px; font-weight:600; padding:2px 8px; border-radius:3px;
+  background:var(--high-lt); color:var(--high);
+}
+.cb-chain { display:flex; gap:3px; align-items:center; margin-top:7px; flex-wrap:wrap; }
+.cb-node {
+  font-size:10px; padding:2px 6px; border-radius:3px; font-weight:500;
+}
+.cb-node.done   { background:var(--danger-lt); color:var(--danger); }
+.cb-node.active { background:var(--high-lt);   color:var(--high); }
+.cb-node.next   { background:var(--bg); color:var(--tx3); border:1px solid var(--border); }
+.cb-arr { font-size:9px; color:var(--tx3); }
+
+/* Simulate button */
+.sim-btn {
+  position:absolute; bottom:46px; right:52px; z-index:20;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:5px; padding:6px 14px;
+  font-size:11px; font-weight:600; color:var(--accent);
+  cursor:pointer; font-family:var(--sans);
+  box-shadow:0 1px 4px rgba(0,0,0,0.08); transition:background 0.12s;
+}
+.sim-btn:hover { background:var(--accent-lt); }
+
+/* ─────────────────────────────────────────────────────── */
+/*  PAGE 2 — MY AREA                                       */
+/* ─────────────────────────────────────────────────────── */
+#page-myarea .myarea-body {
+  flex:1; display:grid; grid-template-columns:1fr 320px; overflow:hidden;
+}
+.myarea-main { overflow-y:auto; padding:18px; }
+.myarea-main::-webkit-scrollbar { width:3px; }
+.myarea-main::-webkit-scrollbar-thumb { background:var(--border-2); }
+
+.myarea-header { margin-bottom:16px; }
+.myarea-location { font-size:20px; font-weight:700; color:var(--tx); letter-spacing:-0.02em; }
+.myarea-sub { font-size:12px; color:var(--tx3); margin-top:2px; }
+.myarea-risk-tag {
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:11px; font-weight:600; padding:3px 9px; border-radius:4px;
+  margin-top:6px;
+}
+
+/* Condition grid */
+.cond-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.cond-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:7px;
+  padding:12px; cursor:pointer;
+}
+.cond-card:hover { border-color:var(--border-2); }
+.cond-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+.cond-name { font-size:10px; font-weight:600; color:var(--tx3); }
+.cond-icon { font-size:16px; }
+.cond-value { font-size:23px; font-weight:700; font-family:var(--mono); line-height:1; }
+.cond-unit  { font-size:11px; font-weight:400; color:var(--tx3); margin-left:2px; }
+.cond-note  { font-size:10px; color:var(--tx3); margin-top:4px; line-height:1.4; }
+.cond-bar   { height:3px; background:var(--border); border-radius:2px; margin-top:8px; overflow:hidden; }
+.cond-fill  { height:100%; border-radius:2px; }
+
+/* Section block */
+.sblock {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:7px; padding:14px; margin-bottom:12px;
+}
+.sblock-title {
+  font-size:12px; font-weight:600; color:var(--tx);
+  margin-bottom:12px; display:flex; align-items:center; gap:8px;
+}
+.sblock-sub { font-size:10px; color:var(--tx3); font-weight:400; margin-left:auto; }
+
+/* Time slider */
+.tslider { padding:2px 0 14px; }
+.tslider-ticks { display:flex; justify-content:space-between; margin-bottom:6px; }
+.tslider-tick { font-size:10px; font-family:var(--mono); color:var(--tx3); }
+.tslider-tick.now { color:var(--accent); font-weight:600; }
+.tslider-track { height:3px; background:var(--border); border-radius:2px; position:relative; }
+.tslider-fill  { height:100%; border-radius:2px; background:var(--accent); }
+.tslider-handle {
+  position:absolute; right:0; top:-5px;
+  width:13px; height:13px; border-radius:50%;
+  background:var(--accent); border:2px solid var(--surface);
+  box-shadow:0 1px 4px rgba(0,0,0,0.15);
+}
+.change-pills { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.change-pill { font-size:11px; display:flex; align-items:center; gap:5px; }
+.cp-swatch { width:8px; height:8px; border-radius:2px; }
+
+/* Priority list */
+.priority-list { display:flex; flex-direction:column; gap:8px; }
+.pri-item {
+  display:flex; gap:10px; padding:10px;
+  background:var(--bg); border-radius:5px; align-items:flex-start;
+  border-left:3px solid var(--border);
+}
+.pri-item.danger { border-left-color:var(--danger); }
+.pri-item.high   { border-left-color:var(--high); }
+.pri-item.amber  { border-left-color:var(--amber); }
+.pri-num { font-size:14px; font-family:var(--mono); color:var(--tx3); line-height:1.1; margin-top:1px; }
+.pri-title { font-size:12px; font-weight:600; color:var(--tx); margin-bottom:2px; }
+.pri-desc  { font-size:11px; color:var(--tx2); line-height:1.5; }
+.pri-tag {
+  display:inline-block; font-size:10px; font-weight:500;
+  padding:2px 6px; border-radius:3px; margin-top:4px;
+}
+.pri-tag.danger { background:var(--danger-lt); color:var(--danger); }
+.pri-tag.high   { background:var(--high-lt);   color:var(--high); }
+.pri-tag.amber  { background:var(--amber-lt);   color:var(--amber); }
+
+/* Myarea right panel */
+.myarea-right {
+  background:var(--surface); border-left:1px solid var(--border);
+  overflow-y:auto; padding:14px;
+}
+.myarea-right::-webkit-scrollbar { width:3px; }
+.myarea-right::-webkit-scrollbar-thumb { background:var(--border-2); }
+
+/* Charts */
+.chart-wrap    { position:relative; height:130px; }
+.chart-wrap-sm { position:relative; height:95px; }
+.chart-wrap-lg { position:relative; height:180px; }
+
+/* Ward search */
+.ward-search {
+  display:flex; align-items:center; gap:7px;
+  background:var(--bg); border:1px solid var(--border); border-radius:5px;
+  padding:6px 10px; margin-bottom:14px;
+}
+.ward-search input {
+  background:none; border:none; outline:none; font-size:12px;
+  color:var(--tx); font-family:var(--sans); flex:1;
+}
+
+/* ─────────────────────────────────────────────────────── */
+/*  PAGE 3 — CASCADE                                       */
+/* ─────────────────────────────────────────────────────── */
+#page-cascade .cascade-body {
+  flex:1; display:grid; grid-template-columns:1fr 320px; overflow:hidden;
+}
+.cascade-main { overflow-y:auto; padding:18px; }
+.cascade-main::-webkit-scrollbar { width:3px; }
+.cascade-main::-webkit-scrollbar-thumb { background:var(--border-2); }
+
+.cascade-header { margin-bottom:16px; }
+.cascade-stage-pill {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:600; padding:3px 10px; border-radius:4px;
+  background:var(--high-lt); color:var(--high); margin-bottom:6px;
+}
+.cascade-h1 { font-size:20px; font-weight:700; color:var(--tx); letter-spacing:-0.02em; }
+.cascade-sub { font-size:12px; color:var(--tx3); margin-top:3px; }
+
+/* Chain viz */
+.chain-viz {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:7px; padding:18px 14px; margin-bottom:14px;
+  position:relative; overflow:hidden;
+}
+.chain-viz::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:linear-gradient(90deg, var(--danger) 0%, var(--high) 35%, var(--amber) 65%, var(--accent) 100%);
+}
+.chain-nodes { display:flex; gap:0; }
+.chain-node {
+  flex:1; display:flex; flex-direction:column; align-items:center;
+  padding:12px 6px; position:relative;
+}
+.chain-node:not(:last-child)::after {
+  content:'›'; position:absolute; right:-8px; top:50%;
+  transform:translateY(-50%); color:var(--tx3); font-size:18px; z-index:1;
+}
+.cn-icon {
+  width:44px; height:44px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; margin-bottom:8px; border:2px solid;
+}
+.cn-icon.triggered { background:var(--danger-lt); border-color:var(--danger); }
+.cn-icon.active    { background:var(--high-lt);   border-color:var(--high); animation:ring-pulse 2.4s infinite; }
+.cn-icon.elevated  { background:var(--amber-lt);  border-color:var(--amber); }
+.cn-icon.monitor   { background:var(--accent-lt); border-color:var(--accent-md); }
+@keyframes ring-pulse {
+  0%,100% { box-shadow:0 0 0 0 rgba(192,86,33,0.25); }
+  55%     { box-shadow:0 0 0 9px rgba(192,86,33,0); }
+}
+.cn-label  { font-size:11px; font-weight:600; color:var(--tx); text-align:center; margin-bottom:3px; }
+.cn-prob   { font-size:13px; font-family:var(--mono); font-weight:700; text-align:center; }
+.cn-prob.triggered { color:var(--danger); }
+.cn-prob.active    { color:var(--high); }
+.cn-prob.elevated  { color:var(--amber); }
+.cn-prob.monitor   { color:var(--accent); }
+.cn-ci   { font-size:9px; font-family:var(--mono); color:var(--tx3); text-align:center; }
+.cn-tag  { font-size:9px; padding:2px 6px; border-radius:3px; margin-top:4px; text-align:center; }
+.cn-tag.triggered { background:var(--danger-lt); color:var(--danger); }
+.cn-tag.active    { background:var(--high-lt);   color:var(--high); }
+.cn-tag.elevated  { background:var(--amber-lt);  color:var(--amber); }
+.cn-tag.monitor   { background:var(--accent-lt); color:var(--accent); }
+
+/* Gauge row */
+.gauge-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+.gauge-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:7px; padding:14px; text-align:center;
+}
+.gauge-card-label { font-size:10px; color:var(--tx3); margin-bottom:8px; }
+.gauge-canvas-wrap { position:relative; height:75px; display:flex; align-items:center; justify-content:center; }
+canvas.gc { position:absolute; }
+.gauge-num { font-size:22px; font-weight:700; font-family:var(--mono); position:relative; z-index:1; }
+.gauge-ci-text { font-size:9px; font-family:var(--mono); color:var(--tx3); margin-top:3px; }
+
+/* Explainer steps */
+.explainer { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.exp-step {
+  display:flex; gap:10px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:7px; padding:12px;
+}
+.exp-num {
+  width:22px; height:22px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; font-family:var(--mono); flex-shrink:0;
+}
+.exp-num.danger { background:var(--danger-lt); color:var(--danger); }
+.exp-num.high   { background:var(--high-lt);   color:var(--high); }
+.exp-num.amber  { background:var(--amber-lt);   color:var(--amber); }
+.exp-num.accent { background:var(--accent-lt);  color:var(--accent); }
+.exp-body { flex:1; }
+.exp-title { font-size:12px; font-weight:600; color:var(--tx); margin-bottom:3px; }
+.exp-desc  { font-size:11px; color:var(--tx2); line-height:1.5; }
+.exp-src   { font-size:10px; font-family:var(--mono); color:var(--tx3); margin-top:4px; }
+
+/* Cascade right */
+.cascade-right {
+  background:var(--surface); border-left:1px solid var(--border);
+  overflow-y:auto; padding:14px;
+}
+.cascade-right::-webkit-scrollbar { width:3px; }
+.cascade-right::-webkit-scrollbar-thumb { background:var(--border-2); }
+
+.exposure-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+.exp-cell {
+  background:var(--bg); border-radius:5px; padding:10px; text-align:center;
+}
+.exp-num-big { font-size:21px; font-weight:700; font-family:var(--mono); color:var(--tx); }
+.exp-name    { font-size:10px; color:var(--tx3); margin-top:2px; }
+
+.ward-risk-list { display:flex; flex-direction:column; gap:5px; }
+.wr-item {
+  display:flex; align-items:center; gap:8px;
+  padding:7px 9px; border-radius:5px;
+  background:var(--bg); border-left:2px solid;
+}
+.wr-name { flex:1; font-size:11px; font-weight:500; color:var(--tx); }
+.wr-prob { font-size:11px; font-family:var(--mono); font-weight:600; }
+.wr-pop  { font-size:10px; color:var(--tx3); font-family:var(--mono); }
+
+.disclaimer {
+  background:var(--amber-lt); border:1px solid #F0D898;
+  border-radius:6px; padding:10px 12px; margin-top:10px;
+  font-size:11px; color:#5C4200; line-height:1.5;
+}
+
+/* ─────────────────────────────────────────────────────── */
+/*  PAGE 4 — PUNE CHANGING                                 */
+/* ─────────────────────────────────────────────────────── */
+#page-changing .changing-body {
+  flex:1; display:flex; flex-direction:column; overflow:hidden;
+}
+.changing-topbar {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:10px 16px; display:flex; align-items:center; gap:14px; flex-shrink:0;
+}
+.changing-title { font-size:14px; font-weight:600; color:var(--tx); }
+.pill-group { display:flex; gap:5px; flex-wrap:wrap; }
+.cpill {
+  padding:4px 11px; border-radius:20px; font-size:11px; font-weight:500;
+  cursor:pointer; border:1px solid var(--border); color:var(--tx2);
+  background:none; font-family:var(--sans); transition:0.12s;
+}
+.cpill.active { border-color:var(--accent); color:var(--accent); background:var(--accent-lt); }
+
+.changing-body-inner {
+  flex:1; display:grid; grid-template-columns:1fr 320px; overflow:hidden;
+}
+.changing-map-area { position:relative; overflow:hidden; }
+.changing-panel { background:var(--surface); border-left:1px solid var(--border); overflow-y:auto; padding:14px; }
+.changing-panel::-webkit-scrollbar { width:3px; }
+.changing-panel::-webkit-scrollbar-thumb { background:var(--border-2); }
+
+.year-slider-wrap {
+  background:var(--surface); border-top:1px solid var(--border);
+  padding:10px 20px 12px; flex-shrink:0;
+}
+.year-marks { display:flex; justify-content:space-between; margin-bottom:6px; }
+.year-mark {
+  font-size:11px; font-family:var(--mono); color:var(--tx3);
+  cursor:pointer; padding:2px 5px; border-radius:3px; transition:0.12s;
+}
+.year-mark.active { color:var(--accent); background:var(--accent-lt); font-weight:600; }
+.year-track { height:4px; background:var(--border); border-radius:2px; position:relative; }
+.year-fill   { height:100%; background:var(--accent); border-radius:2px; }
+.year-handle {
+  position:absolute; right:0; top:-4px;
+  width:12px; height:12px; border-radius:50%;
+  background:var(--accent); border:2px solid var(--surface);
+  box-shadow:0 1px 4px rgba(0,0,0,0.15);
+}
+
+/* Change stat overlay */
+.change-overlay {
+  position:absolute; top:12px; right:12px; z-index:10;
+  background:rgba(255,255,255,0.96); border:1px solid var(--border);
+  border-radius:7px; padding:12px 14px; min-width:190px;
+  backdrop-filter:blur(4px);
+  box-shadow:0 2px 10px rgba(0,0,0,0.07);
+}
+.co-title { font-size:10px; font-weight:600; color:var(--tx3); margin-bottom:9px; }
+.co-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.co-label { font-size:11px; color:var(--tx2); }
+.co-val { font-size:12px; font-family:var(--mono); font-weight:600; }
+.co-bar { height:2px; background:var(--border); margin-top:2px; overflow:hidden; border-radius:1px; }
+.co-fill { height:100%; border-radius:1px; }
+
+.top5-overlay {
+  position:absolute; top:12px; left:12px; z-index:10;
+  background:rgba(255,255,255,0.96); border:1px solid var(--border);
+  border-radius:7px; padding:12px 14px; min-width:200px;
+  backdrop-filter:blur(4px);
+  box-shadow:0 2px 10px rgba(0,0,0,0.07);
+}
+.t5-title { font-size:10px; font-weight:600; color:var(--tx3); margin-bottom:8px; }
+.t5-row {
+  display:flex; align-items:center; gap:8px;
+  padding:5px 0; border-bottom:1px solid var(--border);
+  font-size:11px;
+}
+.t5-row:last-child { border-bottom:none; }
+.t5-rank { color:var(--tx3); font-family:var(--mono); width:14px; }
+.t5-name { flex:1; color:var(--tx); }
+.t5-val  { font-family:var(--mono); font-weight:600; }
+.t5-val.neg { color:var(--danger); }
+.t5-val.pos { color:var(--safe); }
+
+/* ── GLOBAL UTILS ─────────────────────────────────────── */
+.rp-label {
+  font-size:10px; font-weight:600; color:var(--tx3);
+  margin-bottom:9px; padding-bottom:6px; border-bottom:1px solid var(--border);
+}
+.divider { height:1px; background:var(--border); margin:12px 0; }
+.mt6 { margin-top:6px; }
+.btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:7px 14px; border-radius:5px;
+  font-size:12px; font-weight:500; cursor:pointer;
+  border:1px solid; font-family:var(--sans); transition:0.12s;
+}
+.btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn-primary:hover { background:#1A6B50; }
+.btn-ghost { background:none; color:var(--tx2); border-color:var(--border); }
+.btn-ghost:hover { background:var(--bg); color:var(--tx); }
+
+.tag {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 7px; border-radius:3px; font-size:10px; font-weight:500;
+}
+.tag.danger { background:var(--danger-lt); color:var(--danger); }
+.tag.high   { background:var(--high-lt);   color:var(--high); }
+.tag.amber  { background:var(--amber-lt);  color:var(--amber); }
+.tag.safe   { background:var(--safe-lt);   color:var(--safe); }
+.tag.accent { background:var(--accent-lt); color:var(--accent); }
+
+.form-label  { font-size:10px; font-weight:600; color:var(--tx3); margin-bottom:4px; }
+.form-input  { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:7px 10px; font-size:12px; color:var(--tx); font-family:var(--sans); outline:none; transition:border-color 0.12s; }
+.form-input:focus { border-color:var(--accent); }
+.form-select { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:7px 10px; font-size:12px; color:var(--tx); font-family:var(--sans); outline:none; appearance:none; }
+.form-textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:7px 10px; font-size:12px; color:var(--tx); font-family:var(--sans); outline:none; resize:vertical; min-height:64px; }
+.form-row { margin-bottom:10px; }
+.upload-zone { border:1px dashed var(--border-2); border-radius:5px; padding:16px; text-align:center; font-size:12px; color:var(--tx3); cursor:pointer; transition:0.12s; }
+.upload-zone:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-lt); }
+
+/* Building rise animation — ONE deliberate moment */
+@keyframes rise {
+  from { transform:scaleY(0); opacity:0; }
+  to   { transform:scaleY(1); opacity:1; }
+}
+.bldg { transform-origin:bottom; animation:rise 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+
+/* Modal */
+#reportModal {
+  display:none; position:fixed; inset:0; z-index:200;
+  background:rgba(24,43,36,0.35); backdrop-filter:blur(3px);
+  align-items:center; justify-content:center;
+}
+.modal-box {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:20px; width:360px;
+  max-height:90vh; overflow-y:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,0.14);
+}
+.modal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.modal-title { font-size:14px; font-weight:600; color:var(--tx); }
+.modal-close { background:none; border:none; font-size:18px; color:var(--tx3); cursor:pointer; }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:72px; left:50%; transform:translateX(-50%);
+  background:var(--safe-lt); border:1px solid #B8DEC8; color:var(--safe);
+  padding:9px 18px; border-radius:6px; font-size:12px;
+  z-index:300; font-family:var(--sans); font-weight:500;
+  box-shadow:0 2px 10px rgba(0,0,0,0.1);
+}
+</style>
+
+<script src='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js'></script>
+<link href='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css' rel='stylesheet' />
+</head>
+<body>
+<div class="shell">
+
+<!-- ══════════ TOP BAR ══════════ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">C</div>
+    <span class="brand-name">CascadeIQ</span>
+    <span class="brand-city">Pune</span>
+  </div>
+  <div class="topbar-divider"></div>
+  <div class="alert-strip">
+    <div class="alert-pill high">
+      <span class="apill-dot pulse"></span>
+      IMD Flash Flood Watch
+    </div>
+    <div class="alert-text">
+      <b>Western Pune district</b> — issued 14:22 IST ·
+      Extreme rainfall: 88 mm / 3h · Landslide susceptibility zones active
+    </div>
+    <div class="alert-pill orange" style="cursor:pointer;background:var(--high-lt);color:var(--high);border-color:#F4C5AB" onclick="showPage('cascade')">
+      <span class="apill-dot" style="background:var(--high)"></span>
+      Cascade Active — P = 0.72
+    </div>
+  </div>
+  <div class="topbar-divider"></div>
+  <div class="topbar-right">
+    <div class="source-row">
+      <span class="src-dot ok"></span><span class="src-label">IMD</span>
+    </div>
+    <div class="source-row">
+      <span class="src-dot ok"></span><span class="src-label">CWC</span>
+    </div>
+    <div class="source-row">
+      <span class="src-dot ok"></span><span class="src-label">WAQI</span>
+    </div>
+    <div class="source-row">
+      <span class="src-dot stale"></span><span class="src-label">MPCB</span>
+    </div>
+    <div class="topbar-divider"></div>
+    <span class="topbar-time">14:38 IST · Oct 04 2026</span>
+    <div class="topbar-divider"></div>
+    <div class="mode-toggle">
+      <button class="mode-btn active" onclick="setMode(this)">Citizen</button>
+      <button class="mode-btn" onclick="setMode(this)">Govt</button>
+      <button class="mode-btn" onclick="setMode(this)">Field</button>
+    </div>
+  </div>
+</header>
+
+<div class="content">
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar">
+  <div class="sidebar-nav">
+    <div class="snav-tab active" onclick="showPage('home');setTab(this)">Map</div>
+    <div class="snav-tab" onclick="showPage('myarea');setTab(this)">My Area</div>
+    <div class="snav-tab" onclick="showPage('cascade');setTab(this)">Cascade</div>
+    <div class="snav-tab" onclick="showPage('changing');setTab(this)">Changing</div>
+  </div>
+
+  <div class="sidebar-body">
+    <!-- LAYERS SECTION -->
+    <div class="s-section">
+      <div class="s-section-head" onclick="toggleSection(this)">
+        <span class="s-section-title">Map layers</span>
+        <span class="s-section-chevron open">▾</span>
+      </div>
+      <div class="s-section-body open">
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;color:var(--tx3);margin-bottom:5px;">Basemap</div>
+          <div class="radio-group">
+            <div class="radio-btn active">Terrain</div>
+            <div class="radio-btn" onclick="setRadio(this)">Satellite</div>
+            <div class="radio-btn" onclick="setRadio(this)">Street</div>
+          </div>
+        </div>
+        <div class="layer-item">
+          <div class="layer-info">
+            <div class="layer-name">Hazard overlay</div>
+            <div class="layer-desc">Flood &amp; landslide risk zones from CascadeIQ model</div>
+          </div>
+          <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="layer-item">
+          <div class="layer-info">
+            <div class="layer-name">Ward boundaries</div>
+            <div class="layer-desc">PMC ward outlines, 41 wards</div>
+          </div>
+          <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="layer-item">
+          <div class="layer-info">
+            <div class="layer-name">Rivers &amp; reservoirs</div>
+            <div class="layer-desc">Mula, Mutha, Pavana, Indrayani</div>
+          </div>
+          <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="layer-item">
+          <div class="layer-info">
+            <div class="layer-name">Green cover</div>
+            <div class="layer-desc">NDVI-derived vegetation from Bhuvan</div>
+          </div>
+          <label class="toggle"><input type="checkbox"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="layer-item">
+          <div class="layer-info">
+            <div class="layer-name">Critical assets</div>
+            <div class="layer-desc">Hospitals, schools, fire stations</div>
+          </div>
+          <label class="toggle"><input type="checkbox"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+        <div class="layer-item">
+          <div class="layer-info">
+            <div class="layer-name">3D buildings</div>
+            <div class="layer-desc">Building extrusions — urban density</div>
+          </div>
+          <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- CURRENT CONDITIONS -->
+    <div class="s-section">
+      <div class="s-section-head" onclick="toggleSection(this)">
+        <span class="s-section-title">Current conditions</span>
+        <span class="s-section-chevron open">▾</span>
+      </div>
+      <div class="s-section-body open">
+        <div class="stat-row"><span class="stat-label">Rainfall / 3h</span><span class="stat-val danger">88<span class="stat-unit">mm</span></span></div>
+        <div class="stat-row"><span class="stat-label">AQI (Hadapsar)</span><span class="stat-val high">156</span></div>
+        <div class="stat-row"><span class="stat-label">Mutha river</span><span class="stat-val high">4.2<span class="stat-unit">m</span></span></div>
+        <div class="stat-row"><span class="stat-label">Heat index</span><span class="stat-val amber">34°<span class="stat-unit">C</span></span></div>
+        <div class="stat-row"><span class="stat-label">Khadakwasla</span><span class="stat-val accent">82<span class="stat-unit">%</span></span></div>
+        <div class="stat-row"><span class="stat-label">Green cover</span><span class="stat-val danger">31<span class="stat-unit">%</span></span></div>
+        <div style="margin-top:8px">
+          <div class="chart-wrap-sm"><canvas id="sidebarRain"></canvas></div>
+          <div style="font-size:10px;color:var(--tx3);margin-top:4px;font-family:var(--mono)">Rainfall last 6h — Open-Meteo</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CASCADE STATUS -->
+    <div class="s-section">
+      <div class="s-section-head" onclick="toggleSection(this)">
+        <span class="s-section-title">Cascade status</span>
+        <span class="s-section-chevron open">▾</span>
+      </div>
+      <div class="s-section-body open">
+        <div class="cascade-mini">
+          <div class="cm-prob">72%</div>
+          <div class="cm-label">Flood probability · CI [0.58–0.84]</div>
+          <div class="cm-chain">
+            <span class="cm-node done">Rainfall</span>
+            <span class="cm-arr">›</span>
+            <span class="cm-node active">Landslide</span>
+            <span class="cm-arr">›</span>
+            <span class="cm-node next">River block</span>
+            <span class="cm-arr">›</span>
+            <span class="cm-node next">Flood</span>
+          </div>
+        </div>
+        <div class="action-list" style="margin-top:8px">
+          <div class="action-item danger">Avoid Sinhagad Road — landslide risk zone active</div>
+          <div class="action-item high">Mutha at Deccan: 4.2 m, rising · danger mark 5.8 m</div>
+          <div class="action-item info" onclick="showPage('cascade')" style="cursor:pointer">View full cascade analysis →</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WHAT TO DO -->
+    <div class="s-section">
+      <div class="s-section-head" onclick="toggleSection(this)">
+        <span class="s-section-title">What to do</span>
+        <span class="s-section-chevron">▾</span>
+      </div>
+      <div class="s-section-body">
+        <div class="action-list">
+          <div class="action-item high">Avoid riverbanks and low-lying roads in western Pune</div>
+          <div class="action-item amber">Keep storm drains near your home clear of debris</div>
+          <div class="action-item info">Check pmc.gov.in for official PMC bulletins</div>
+          <div class="action-item info" onclick="openReport()" style="cursor:pointer">📷 Report blocked drain or waterlogging</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GOVT PRIORITIES -->
+    <div class="s-section">
+      <div class="s-section-head" onclick="toggleSection(this)">
+        <span class="s-section-title">Govt priorities</span>
+        <span class="s-section-chevron">▾</span>
+      </div>
+      <div class="s-section-body">
+        <div class="action-list">
+          <div class="action-item danger">NDRF pre-position: Sinhagad susceptibility zone (GSI Class III)</div>
+          <div class="action-item high">Open Khadakwasla gates — inflow 780 m³/s, capacity 1,200 m³/s</div>
+          <div class="action-item amber">Activate Warje bypass — Sinhagad Road may close within 2h</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="nav-item active" onclick="showPage('home');setNavItem(this)">
+      <span class="nav-icon">🏙</span>Pune Today
+    </div>
+    <div class="nav-item" onclick="showPage('myarea');setNavItem(this)">
+      <span class="nav-icon">📍</span>My Area
+    </div>
+    <div class="nav-item" onclick="showPage('cascade');setNavItem(this)">
+      <span class="nav-icon">⚡</span>Cascade
+      <span class="nav-badge red">Active</span>
+    </div>
+    <div class="nav-item" onclick="showPage('changing');setNavItem(this)">
+      <span class="nav-icon">🌿</span>Pune Changing
+    </div>
+    <div class="nav-item" onclick="openReport()">
+      <span class="nav-icon">📷</span>Report issue
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════ MAIN ══════════ -->
+<main class="main">
+
+<!-- ══════ PAGE 1: PUNE TODAY (3D MAP) ══════ -->
+<div class="page active" id="page-home">
+  <div class="home-body" style="flex:1;position:relative;overflow:hidden">
+
+    <!-- MAP VIEWPORT -->
+    <div class="map-viewport" style="position:absolute;inset:0;bottom:var(--strip)">
+      <div class="map-3d-wrap">
+        <div class="map-3d-scene">
+
+          <!-- PUNE SVG MAP - geographically accurate layout -->
+          <div id="map" style="position:absolute; top:0; left:0; right:0; bottom:0; width:100%; height:100%;"></div>
+        </div>
+      </div>
+
+      <!-- MAP CONTROLS -->
+      <div class="map-controls-panel">
+        <div class="map-ctrl-btn" title="Zoom in">+</div>
+        <div class="map-ctrl-btn" title="Zoom out">−</div>
+        <div class="map-ctrl-btn" style="margin-top:4px" title="Reset view">⊙</div>
+        <div class="map-ctrl-btn active" title="3D view">3D</div>
+        <div class="map-ctrl-btn" title="2D view" onclick="toggle3D(this)">2D</div>
+      </div>
+
+      <!-- CASCADE BADGE -->
+      <div class="cascade-badge">
+        <div class="cb-label">CascadeIQ — Active cascade</div>
+        <div class="cb-main">Extreme rainfall driving landslide risk on Sinhagad corridor</div>
+        <div class="cb-prob">Flood P = 0.72 · CI [0.58–0.84]</div>
+        <div class="cb-chain">
+          <span class="cb-node done">Rainfall</span>
+          <span class="cb-arr">›</span>
+          <span class="cb-node active">Landslide</span>
+          <span class="cb-arr">›</span>
+          <span class="cb-node next">River block</span>
+          <span class="cb-arr">›</span>
+          <span class="cb-node next">Flood</span>
+        </div>
+      </div>
+
+      <!-- SIMULATE BUTTON -->
+      <button class="sim-btn" onclick="simulateCascade()">Simulate heavy rainfall →</button>
+
+      <!-- MAP LEGEND -->
+      <div class="map-legend">
+        <div class="ml-title">HAZARD STATUS</div>
+        <div class="ml-row">
+          <div class="ml-dot" style="background:rgba(192,57,43,0.6)"></div>
+          <span class="ml-label">Extreme</span>
+          <span class="ml-val" style="color:var(--danger)">2 zones</span>
+        </div>
+        <div class="ml-row">
+          <div class="ml-dot" style="background:rgba(192,86,33,0.6)"></div>
+          <span class="ml-label">High</span>
+          <span class="ml-val" style="color:var(--high)">1 zone</span>
+        </div>
+        <div class="ml-row">
+          <div class="ml-dot" style="background:#4B9BC0"></div>
+          <span class="ml-label">Rivers</span>
+          <span class="ml-val" style="color:#2A6880">Rising</span>
+        </div>
+        <div class="ml-row">
+          <div class="ml-dot" style="background:#5AACCF"></div>
+          <span class="ml-label">Reservoirs</span>
+          <span class="ml-val" style="color:var(--accent)">82%</span>
+        </div>
+      </div>
+
+      <!-- WARD TOOLTIP -->
+      <div class="ward-tooltip" id="wardTooltip" style="top:180px;left:320px">
+        <div class="wt-name" id="wt-name">Deccan / Shivajinagar</div>
+        <div class="wt-row"><span class="wt-label">Flood risk</span><span class="wt-val" style="color:var(--amber)">Moderate</span></div>
+        <div class="wt-row"><span class="wt-label">AQI</span><span class="wt-val">112</span></div>
+        <div class="wt-row"><span class="wt-label">Population</span><span class="wt-val">1.4 lakh</span></div>
+        <div class="wt-row"><span class="wt-label">Green cover</span><span class="wt-val">33%</span></div>
+      </div>
+
+      <!-- COORDS -->
+      <div class="map-coords">
+        18.5204° N<span>|</span>73.8567° E<span>|</span>elev: 560 m<span>|</span>Pune, Maharashtra
+      </div>
+    </div>
+
+    <!-- STATUS STRIP -->
+    <div class="status-strip" style="position:absolute;bottom:0;left:0;right:0">
+      <div class="sc" onclick="showPage('myarea')">
+        <span class="sc-icon">🌧</span>
+        <div class="sc-data">
+          <span class="sc-label">Rainfall / 3h</span>
+          <span class="sc-value danger">88 mm</span>
+          <span class="sc-trend danger">↑ 2.3× normal</span>
+        </div>
+      </div>
+      <div class="sc">
+        <span class="sc-icon">🌫</span>
+        <div class="sc-data">
+          <span class="sc-label">AQI — Hadapsar</span>
+          <span class="sc-value high">156</span>
+          <span class="sc-trend high">Unhealthy</span>
+        </div>
+      </div>
+      <div class="sc">
+        <span class="sc-icon">🌊</span>
+        <div class="sc-data">
+          <span class="sc-label">Mutha at Deccan</span>
+          <span class="sc-value high">4.2 m</span>
+          <span class="sc-trend" style="color:var(--tx3)">danger: 5.8 m</span>
+        </div>
+      </div>
+      <div class="sc">
+        <span class="sc-icon">🌡</span>
+        <div class="sc-data">
+          <span class="sc-label">Heat index</span>
+          <span class="sc-value amber">34°C</span>
+          <span class="sc-trend" style="color:var(--tx3)">feels 39°C</span>
+        </div>
+      </div>
+      <div class="sc">
+        <span class="sc-icon">💧</span>
+        <div class="sc-data">
+          <span class="sc-label">Khadakwasla</span>
+          <span class="sc-value accent">82%</span>
+          <span class="sc-trend high">↑ filling fast</span>
+        </div>
+      </div>
+      <div class="sc" onclick="showPage('changing')">
+        <span class="sc-icon">🌿</span>
+        <div class="sc-data">
+          <span class="sc-label">Green cover</span>
+          <span class="sc-value danger">31%</span>
+          <span class="sc-trend danger">↓ −4% since 2020</span>
+        </div>
+      </div>
+      <div class="sc">
+        <span class="sc-icon">🚗</span>
+        <div class="sc-data">
+          <span class="sc-label">Traffic</span>
+          <span class="sc-value high">Slow</span>
+          <span class="sc-trend" style="color:var(--tx3)">6 roads blocked</span>
+        </div>
+      </div>
+      <div class="sc">
+        <span class="sc-icon">🗑</span>
+        <div class="sc-data">
+          <span class="sc-label">Waste reports</span>
+          <span class="sc-value amber">14</span>
+          <span class="sc-trend" style="color:var(--tx3)">open today</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE 2: MY AREA ══════ -->
+<div class="page" id="page-myarea">
+  <div class="myarea-body">
+    <div class="myarea-main">
+      <div class="ward-search">
+        <span style="color:var(--tx3)">📍</span>
+        <input type="text" placeholder="Search ward or pincode…" value="Kothrud, Pune - 411038">
+      </div>
+      <div class="myarea-header">
+        <div class="myarea-location">Kothrud, Pune</div>
+        <div class="myarea-sub">Ward 14 · PMC · Population approx. 1.8 lakh · 411038</div>
+        <div class="myarea-risk-tag high-lt" style="background:var(--high-lt);color:var(--high)">
+          <span style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span>
+          Moderate–High risk today
+        </div>
+      </div>
+
+      <div class="cond-grid">
+        <div class="cond-card">
+          <div class="cond-top"><span class="cond-name">Rainfall / 3h</span><span class="cond-icon">🌧</span></div>
+          <div><span class="cond-value high">72</span><span class="cond-unit">mm</span></div>
+          <div class="cond-note">1.9× October daily normal · anomaly +68 mm</div>
+          <div class="cond-bar"><div class="cond-fill" style="width:75%;background:var(--high)"></div></div>
+        </div>
+        <div class="cond-card">
+          <div class="cond-top"><span class="cond-name">AQI</span><span class="cond-icon">🌫</span></div>
+          <div><span class="cond-value amber">118</span></div>
+          <div class="cond-note">PM2.5: 62 µg/m³ · Moderate, sensitive groups at risk</div>
+          <div class="cond-bar"><div class="cond-fill" style="width:47%;background:var(--amber)"></div></div>
+        </div>
+        <div class="cond-card">
+          <div class="cond-top"><span class="cond-name">Flood risk</span><span class="cond-icon">🌊</span></div>
+          <div><span class="cond-value high">High</span></div>
+          <div class="cond-note">3 confirmed waterlogging points · Paud Road low zone</div>
+          <div class="cond-bar"><div class="cond-fill" style="width:68%;background:var(--high)"></div></div>
+        </div>
+        <div class="cond-card">
+          <div class="cond-top"><span class="cond-name">Heat index</span><span class="cond-icon">🌡</span></div>
+          <div><span class="cond-value amber">36</span><span class="cond-unit">°C</span></div>
+          <div class="cond-note">Feels like 40°C · Low vegetation in eastern pocket</div>
+          <div class="cond-bar"><div class="cond-fill" style="width:60%;background:var(--amber)"></div></div>
+        </div>
+        <div class="cond-card">
+          <div class="cond-top"><span class="cond-name">Water stress</span><span class="cond-icon">💧</span></div>
+          <div><span class="cond-value safe">Low</span></div>
+          <div class="cond-note">Khadakwasla 82% · Good supply for ~45 days</div>
+          <div class="cond-bar"><div class="cond-fill" style="width:22%;background:var(--safe)"></div></div>
+        </div>
+        <div class="cond-card">
+          <div class="cond-top"><span class="cond-name">Green cover</span><span class="cond-icon">🌿</span></div>
+          <div><span class="cond-value amber">29</span><span class="cond-unit">%</span></div>
+          <div class="cond-note">Below ward avg 34% · −6% since 2018</div>
+          <div class="cond-bar"><div class="cond-fill" style="width:29%;background:var(--amber)"></div></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="sblock" style="margin-bottom:0">
+          <div class="sblock-title">Rainfall — last 24h<span class="sblock-sub">Open-Meteo · 4 min ago</span></div>
+          <div class="chart-wrap"><canvas id="rainfallChart"></canvas></div>
+        </div>
+        <div class="sblock" style="margin-bottom:0">
+          <div class="sblock-title">AQI trend — 7 days<span class="sblock-sub">WAQI · 12 min ago</span></div>
+          <div class="chart-wrap"><canvas id="aqiChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="sblock">
+        <div class="sblock-title">Land cover change — 2010 to 2025<span class="sblock-sub">Bhuvan LULC · Kothrud ward</span></div>
+        <div class="tslider">
+          <div class="tslider-ticks">
+            <span class="tslider-tick">2010</span>
+            <span class="tslider-tick">2015</span>
+            <span class="tslider-tick">2020</span>
+            <span class="tslider-tick now">2025 ▾</span>
+          </div>
+          <div class="tslider-track">
+            <div class="tslider-fill"></div>
+            <div class="tslider-handle"></div>
+          </div>
+        </div>
+        <div class="change-pills">
+          <div class="change-pill"><div class="cp-swatch" style="background:var(--danger)"></div><span style="color:var(--tx2)">Built-up</span><b style="margin-left:4px;color:var(--danger)">+38%</b></div>
+          <div class="change-pill"><div class="cp-swatch" style="background:var(--safe)"></div><span style="color:var(--tx2)">Vegetation</span><b style="margin-left:4px;color:var(--danger)">−29%</b></div>
+          <div class="change-pill"><div class="cp-swatch" style="background:#4B9BC0"></div><span style="color:var(--tx2)">Water bodies</span><b style="margin-left:4px;color:var(--amber)">−8%</b></div>
+          <div class="change-pill"><div class="cp-swatch" style="background:var(--tx3)"></div><span style="color:var(--tx2)">Open land</span><b style="margin-left:4px;color:var(--danger)">−44%</b></div>
+        </div>
+        <div style="margin-top:12px"><div class="chart-wrap-sm"><canvas id="changeChart"></canvas></div></div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:6px">Change detected via Bhuvan LULC — requires official verification for legal conclusions</div>
+      </div>
+
+      <div class="sblock">
+        <div class="sblock-title">What to watch — Kothrud</div>
+        <div class="priority-list">
+          <div class="pri-item danger">
+            <div class="pri-num">1</div>
+            <div>
+              <div class="pri-title">Flood risk near Mutha drain — 3 known spots</div>
+              <div class="pri-desc">Low-lying areas on the eastern edge (near Paud Road) historically waterlog within 90 min of 40 mm+ rainfall. Current rainfall already exceeds this threshold.</div>
+              <span class="pri-tag danger">Extreme today</span>
+            </div>
+          </div>
+          <div class="pri-item high">
+            <div class="pri-num">2</div>
+            <div>
+              <div class="pri-title">Green cover decline — 29% vs 34% ward average</div>
+              <div class="pri-desc">Vegetation loss since 2018 is reducing rainfall absorption and increasing heat in the eastern pocket. Tree restoration priority score: High.</div>
+              <span class="pri-tag high">Long-term risk</span>
+            </div>
+          </div>
+          <div class="pri-item amber">
+            <div class="pri-num">3</div>
+            <div>
+              <div class="pri-title">AQI elevated — construction on Paud Road</div>
+              <div class="pri-desc">PM2.5 at 62 µg/m³ — above WHO 24h guideline of 15 µg/m³. Children and elderly should reduce outdoor time in the afternoon.</div>
+              <span class="pri-tag amber">Monitor</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="myarea-right">
+      <div class="rp-label">River levels — Pune</div>
+      <div class="chart-wrap"><canvas id="riverChart"></canvas></div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;margin-bottom:12px">
+        <div><div style="font-size:16px;font-family:var(--mono);font-weight:700;color:var(--high)">4.2 m</div><div style="font-size:10px;color:var(--tx3)">Mutha at Deccan</div></div>
+        <div><div style="font-size:16px;font-family:var(--mono);font-weight:700;color:var(--amber)">3.1 m</div><div style="font-size:10px;color:var(--tx3)">Mula at Sangam</div></div>
+      </div>
+
+      <div class="rp-label">Temperature today</div>
+      <div class="chart-wrap-sm"><canvas id="tempChart"></canvas></div>
+
+      <div class="divider"></div>
+      <div class="rp-label">Report an issue</div>
+      <div class="form-row"><div class="form-label">Category</div>
+        <select class="form-select">
+          <option>Select category…</option>
+          <option>Blocked drain</option>
+          <option>Waterlogging</option>
+          <option>Garbage dumping</option>
+          <option>Road damage</option>
+          <option>Water pollution</option>
+          <option>Tree / vegetation issue</option>
+          <option>Noise pollution</option>
+        </select>
+      </div>
+      <div class="form-row"><div class="form-label">Location</div><input class="form-input" placeholder="Street or landmark"></div>
+      <div class="form-row"><div class="form-label">Description</div><textarea class="form-textarea" placeholder="Describe what you see…"></textarea></div>
+      <div class="form-row"><div class="upload-zone">📷 Add photo</div></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="submitReport()">Submit report</button>
+    </div>
+  </div>
+  <div class="status-strip">
+    <div class="sc"><span class="sc-icon">🌧</span><div class="sc-data"><span class="sc-label">Kothrud Rain</span><span class="sc-value high">72 mm</span><span class="sc-trend high">↑ high</span></div></div>
+    <div class="sc"><span class="sc-icon">🌫</span><div class="sc-data"><span class="sc-label">AQI</span><span class="sc-value amber">118</span><span class="sc-trend" style="color:var(--tx3)">moderate</span></div></div>
+    <div class="sc"><span class="sc-icon">🌊</span><div class="sc-data"><span class="sc-label">Flood risk</span><span class="sc-value high">High</span><span class="sc-trend high">↑ rising</span></div></div>
+    <div class="sc"><span class="sc-icon">🌡</span><div class="sc-data"><span class="sc-label">Heat</span><span class="sc-value amber">36°C</span><span class="sc-trend" style="color:var(--tx3)">feels 40°C</span></div></div>
+    <div class="sc"><span class="sc-icon">💧</span><div class="sc-data"><span class="sc-label">Water supply</span><span class="sc-value safe">Normal</span><span class="sc-trend safe">✓ ok</span></div></div>
+    <div class="sc"><span class="sc-icon">🌿</span><div class="sc-data"><span class="sc-label">Green cover</span><span class="sc-value danger">29%</span><span class="sc-trend danger">↓ low</span></div></div>
+  </div>
+</div>
+
+<!-- ══════ PAGE 3: CASCADE ══════ -->
+<div class="page" id="page-cascade">
+  <div class="cascade-body">
+    <div class="cascade-main">
+      <div class="cascade-header">
+        <div><span class="cascade-stage-pill"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;animation:dot-pulse 2s infinite"></span> Stage 2 — Landslide risk elevated</span></div>
+        <div class="cascade-h1">Extreme Rainfall → Cascade Chain</div>
+        <div class="cascade-sub">Western Pune · Sinhagad–Mutha corridor · CascadeIQ Bayesian model v1.2 · Oct 04, 14:38 IST</div>
+      </div>
+
+      <div class="chain-viz">
+        <div class="chain-nodes">
+          <div class="chain-node">
+            <div class="cn-icon triggered">🌧</div>
+            <div class="cn-label">Extreme Rainfall</div>
+            <div class="cn-prob triggered">Confirmed</div>
+            <div class="cn-ci">88 mm / 3h</div>
+            <div class="cn-tag triggered">Triggered</div>
+          </div>
+          <div class="chain-node">
+            <div class="cn-icon active">⛰</div>
+            <div class="cn-label">Landslide</div>
+            <div class="cn-prob active">0.74</div>
+            <div class="cn-ci">[0.61–0.85]</div>
+            <div class="cn-tag active">Active risk</div>
+          </div>
+          <div class="chain-node">
+            <div class="cn-icon elevated">🚧</div>
+            <div class="cn-label">River Blockage</div>
+            <div class="cn-prob elevated">0.52</div>
+            <div class="cn-ci">[0.38–0.67]</div>
+            <div class="cn-tag elevated">Elevated</div>
+          </div>
+          <div class="chain-node">
+            <div class="cn-icon elevated">💧</div>
+            <div class="cn-label">Downstream Flood</div>
+            <div class="cn-prob elevated">0.72</div>
+            <div class="cn-ci">[0.58–0.84]</div>
+            <div class="cn-tag elevated">Elevated</div>
+          </div>
+          <div class="chain-node">
+            <div class="cn-icon monitor">🏘</div>
+            <div class="cn-label">Exposure</div>
+            <div class="cn-prob monitor">5.4 lakh</div>
+            <div class="cn-ci">est. population</div>
+            <div class="cn-tag monitor">Monitoring</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gauge-row">
+        <div class="gauge-card">
+          <div class="gauge-card-label">Flood probability — active node</div>
+          <div class="gauge-canvas-wrap">
+            <canvas id="gaugeFlood" width="160" height="85" class="gc"></canvas>
+            <div class="gauge-num" style="color:var(--high)">72%</div>
+          </div>
+          <div class="gauge-ci-text">Confidence interval: 58% – 84%</div>
+        </div>
+        <div class="gauge-card">
+          <div class="gauge-card-label">Landslide probability — upstream trigger</div>
+          <div class="gauge-canvas-wrap">
+            <canvas id="gaugeLand" width="160" height="85" class="gc"></canvas>
+            <div class="gauge-num" style="color:var(--danger)">74%</div>
+          </div>
+          <div class="gauge-ci-text">Confidence interval: 61% – 85%</div>
+        </div>
+      </div>
+
+      <div class="sblock" style="margin-bottom:12px">
+        <div class="sblock-title">Cascade probability — 12h history + 6h forecast</div>
+        <div class="chart-wrap-lg"><canvas id="cascadeTimeChart"></canvas></div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:6px;font-family:var(--mono)">pgmpy Bayesian model · inputs: Open-Meteo + GSI susceptibility + SRTM terrain</div>
+      </div>
+
+      <div class="explainer">
+        <div class="exp-step">
+          <div class="exp-num danger">1</div>
+          <div class="exp-body">
+            <div class="exp-title">Extreme rainfall exceeds landslide threshold — Sinhagad corridor</div>
+            <div class="exp-desc">88 mm in 3 hours — 2.3× the October daily average. GSI susceptibility data shows this zone as Class III (high). Threshold for elevated landslide risk in this zone: ~45 mm/3h. Current rainfall is 1.96× this threshold.</div>
+            <div class="exp-src">Open-Meteo · GSI Bhusanket · updated 4 min ago</div>
+          </div>
+        </div>
+        <div class="exp-step">
+          <div class="exp-num high">2</div>
+          <div class="exp-body">
+            <div class="exp-title">Landslide debris can reach and block the Mutha channel</div>
+            <div class="exp-desc">Terrain analysis (SRTM avg. slope 22°) shows debris travel time to Mutha of 30–90 minutes. Partial blockage causes upstream backup and downstream surge on release.</div>
+            <div class="exp-src">SRTM terrain + Mutha channel geometry from India-WRIS</div>
+          </div>
+        </div>
+        <div class="exp-step">
+          <div class="exp-num amber">3</div>
+          <div class="exp-body">
+            <div class="exp-title">Downstream flood risk — Hadapsar and Kothrud low-lying pockets</div>
+            <div class="exp-desc">Combined effect: current river level (4.2 m), ongoing rainfall, and potential channel obstruction raises downstream flood P to 0.72. Hadapsar has 3 historically confirmed waterlogging sites at this discharge range.</div>
+            <div class="exp-src">CWC river context · Historical: PMC open data</div>
+          </div>
+        </div>
+        <div class="exp-step">
+          <div class="exp-num accent">4</div>
+          <div class="exp-body">
+            <div class="exp-title">What this model cannot tell you</div>
+            <div class="exp-desc">This model quantifies conditional probability at each cascade stage using Bayesian inference calibrated against historical Pune events. It cannot predict the exact time or location of a landslide or flood. Always follow official NDMA / PMC / IMD advisories.</div>
+            <div class="exp-src">Methodology: pgmpy BN · Based on ScienceDirect 2025 LRDF methodology</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cascade-right">
+      <div class="rp-label">Exposure — affected corridor</div>
+      <div class="exposure-grid">
+        <div class="exp-cell"><div class="exp-num-big" style="color:var(--danger)">5.4L</div><div class="exp-name">Population at risk</div></div>
+        <div class="exp-cell"><div class="exp-num-big" style="color:var(--high)">4</div><div class="exp-name">Hospitals — access at risk</div></div>
+        <div class="exp-cell"><div class="exp-num-big" style="color:var(--amber)">12</div><div class="exp-name">Schools in flood zone</div></div>
+        <div class="exp-cell"><div class="exp-num-big" style="color:var(--high)">7</div><div class="exp-name">Roads likely blocked</div></div>
+      </div>
+
+      <div class="rp-label" style="margin-top:12px">Wards in cascade path</div>
+      <div class="ward-risk-list">
+        <div class="wr-item" style="border-left-color:var(--danger)"><div class="wr-name">Hadapsar</div><div class="wr-prob" style="color:var(--danger)">P = 0.81</div><div class="wr-pop">2.3L</div></div>
+        <div class="wr-item" style="border-left-color:var(--danger)"><div class="wr-name">Sinhagad Road</div><div class="wr-prob" style="color:var(--danger)">P = 0.74</div><div class="wr-pop">landslide zone</div></div>
+        <div class="wr-item" style="border-left-color:var(--high)"><div class="wr-name">Kothrud</div><div class="wr-prob" style="color:var(--high)">P = 0.58</div><div class="wr-pop">1.8L</div></div>
+        <div class="wr-item" style="border-left-color:var(--amber)"><div class="wr-name">Deccan Gymkhana</div><div class="wr-prob" style="color:var(--amber)">P = 0.44</div><div class="wr-pop">0.9L</div></div>
+        <div class="wr-item" style="border-left-color:var(--accent)"><div class="wr-name">Aundh</div><div class="wr-prob" style="color:var(--accent)">P = 0.21</div><div class="wr-pop">monitor</div></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="rp-label">Government priorities</div>
+      <div class="action-list">
+        <div class="action-item danger">Deploy NDRF to Sinhagad Road susceptibility zone (GSI Class III)</div>
+        <div class="action-item high">Control Khadakwasla gates — inflow 780 m³/s, capacity 1,200 m³/s</div>
+        <div class="action-item amber">Open Warje bypass alternate route — Sinhagad Road may close within 2h</div>
+      </div>
+
+      <div class="disclaimer">⚠ CascadeIQ computed risk — not an official government warning. Official IMD / NDMA / PMC alerts always take precedence.</div>
+
+      <div class="divider"></div>
+      <div class="rp-label">Historical validation</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="padding:8px 10px;background:var(--bg);border-radius:5px">
+          <div style="font-size:11px;font-weight:600;color:var(--tx)">Pune Floods — July 2019</div>
+          <div style="font-size:10px;color:var(--tx2);margin-top:2px">Model predicted: 0.76 · Actual: confirmed flood event</div>
+          <div style="font-size:10px;color:var(--safe);font-family:var(--mono)">✓ Within CI [0.62–0.88]</div>
+        </div>
+        <div style="padding:8px 10px;background:var(--bg);border-radius:5px">
+          <div style="font-size:11px;font-weight:600;color:var(--tx)">Mutha River — Sep 2021</div>
+          <div style="font-size:10px;color:var(--tx2);margin-top:2px">Model predicted: 0.41 · Actual: minor waterlogging only</div>
+          <div style="font-size:10px;color:var(--safe);font-family:var(--mono)">✓ Within CI [0.28–0.55]</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="status-strip">
+    <div class="sc"><span class="sc-icon">⚡</span><div class="sc-data"><span class="sc-label">Cascade stage</span><span class="sc-value high">Stage 2</span><span class="sc-trend high">↑ active</span></div></div>
+    <div class="sc"><span class="sc-icon">🌧</span><div class="sc-data"><span class="sc-label">Trigger rainfall</span><span class="sc-value danger">88 mm/3h</span><span class="sc-trend danger">↑ extreme</span></div></div>
+    <div class="sc"><span class="sc-icon">⛰</span><div class="sc-data"><span class="sc-label">Landslide P</span><span class="sc-value danger">0.74</span><span class="sc-trend" style="color:var(--tx3)">[0.61–0.85]</span></div></div>
+    <div class="sc"><span class="sc-icon">🌊</span><div class="sc-data"><span class="sc-label">Flood P</span><span class="sc-value high">0.72</span><span class="sc-trend" style="color:var(--tx3)">[0.58–0.84]</span></div></div>
+    <div class="sc"><span class="sc-icon">👥</span><div class="sc-data"><span class="sc-label">Population at risk</span><span class="sc-value amber">5.4 lakh</span><span class="sc-trend" style="color:var(--tx3)">estimated</span></div></div>
+    <div class="sc"><span class="sc-icon">🏥</span><div class="sc-data"><span class="sc-label">Hospitals</span><span class="sc-value high">4</span><span class="sc-trend" style="color:var(--tx3)">access at risk</span></div></div>
+  </div>
+</div>
+
+<!-- ══════ PAGE 4: PUNE CHANGING ══════ -->
+<div class="page" id="page-changing">
+  <div class="changing-body">
+    <div class="changing-topbar">
+      <div class="changing-title">Pune Is Changing</div>
+      <div class="pill-group">
+        <button class="cpill active" onclick="setPill(this)">Built-up area</button>
+        <button class="cpill" onclick="setPill(this)">Vegetation</button>
+        <button class="cpill" onclick="setPill(this)">Water bodies</button>
+        <button class="cpill" onclick="setPill(this)">Open land</button>
+        <button class="cpill" onclick="setPill(this)">Roads</button>
+        <button class="cpill" onclick="setPill(this)">Protected zones</button>
+      </div>
+      <button class="btn btn-ghost" style="margin-left:auto;font-size:11px">Compare 2 zones</button>
+    </div>
+
+    <div class="changing-body-inner">
+      <div class="changing-map-area">
+        <!-- Reuse Pune map in 2D for changing page -->
+        <svg width="100%" height="100%" viewBox="0 0 900 580" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0">
+          <defs>
+            <radialGradient id="builtUp" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#C0392B" stop-opacity="0.38"/>
+              <stop offset="100%" stop-color="#C0392B" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="greenR" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#1A6B3A" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#1A6B3A" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="900" height="580" fill="#E8F0E8"/>
+          <!-- District outline -->
+          <path d="M190,50 L310,35 L450,45 L570,70 L680,120 L750,200 L780,300 L760,410 L700,500 L590,560 L450,580 L310,570 L200,530 L140,440 L110,340 L130,220 L165,130 Z"
+            fill="#D8E8D0" stroke="#8AAA88" stroke-width="1.5" stroke-dasharray="8,4"/>
+          <!-- Built-up growth zones -->
+          <ellipse cx="240" cy="140" rx="100" ry="80" fill="url(#builtUp)"/>
+          <ellipse cx="500" cy="300" rx="110" ry="88" fill="url(#builtUp)" opacity="0.9"/>
+          <ellipse cx="380" cy="380" rx="80" ry="65" fill="url(#builtUp)" opacity="0.75"/>
+          <ellipse cx="650" cy="220" rx="70" ry="55" fill="url(#builtUp)" opacity="0.7"/>
+          <!-- Green remaining -->
+          <ellipse cx="90" cy="290" rx="65" ry="90" fill="url(#greenR)" opacity="0.85"/>
+          <ellipse cx="700" cy="140" rx="55" ry="42" fill="url(#greenR)" opacity="0.7"/>
+          <ellipse cx="730" cy="460" rx="48" ry="38" fill="url(#greenR)" opacity="0.55"/>
+          <!-- Rivers same as map -->
+          <path d="M145,200 Q200,205 270,208 Q340,210 400,215 Q460,220 530,218 Q590,216 650,210 Q710,205 760,195"
+            fill="none" stroke="#4B9BC0" stroke-width="8" opacity="0.7" stroke-linecap="round"/>
+          <path d="M155,390 Q195,370 235,350 Q275,330 310,312 Q345,296 380,285 Q420,278 470,272 Q520,268 580,262 Q640,256 690,248"
+            fill="none" stroke="#4B9BC0" stroke-width="8" opacity="0.7" stroke-linecap="round"/>
+          <!-- Change arrows -->
+          <text x="235" y="135" fill="#C0392B" font-size="22" text-anchor="middle" opacity="0.75">↗</text>
+          <text x="495" y="294" fill="#C0392B" font-size="22" text-anchor="middle" opacity="0.7">↗</text>
+          <!-- Labels -->
+          <text x="200" y="125" fill="#8A1F10" font-size="11" font-family="Outfit" font-weight="600">Pimpri +52% built</text>
+          <text x="460" y="282" fill="#8A1F10" font-size="11" font-family="Outfit" font-weight="600">Hadapsar +44%</text>
+          <text x="78" y="284" fill="#1A4A28" font-size="10" font-family="Outfit" font-weight="600">Sinhagad ▲</text>
+          <text x="665" y="134" fill="#1A4A28" font-size="10" font-family="Outfit" font-weight="600">Tamhini forest</text>
+          <!-- Year watermark -->
+          <text x="450" y="520" text-anchor="middle" fill="rgba(26,122,94,0.10)" font-size="96" font-family="IBM Plex Mono" font-weight="700">2025</text>
+          <!-- Ward grid -->
+          <line x1="320" y1="35" x2="320" y2="580" stroke="rgba(60,100,70,0.08)" stroke-width="1"/>
+          <line x1="470" y1="45" x2="470" y2="580" stroke="rgba(60,100,70,0.08)" stroke-width="1"/>
+          <line x1="110" y1="220" x2="780" y2="220" stroke="rgba(60,100,70,0.08)" stroke-width="1"/>
+          <line x1="110" y1="370" x2="780" y2="370" stroke="rgba(60,100,70,0.08)" stroke-width="1"/>
+        </svg>
+
+        <div class="top5-overlay">
+          <div class="t5-title">Fastest changing zones</div>
+          <div class="t5-row"><span class="t5-rank">1</span><span class="t5-name">Pimpri-Chinchwad</span><span class="t5-val neg">+52% built</span></div>
+          <div class="t5-row"><span class="t5-rank">2</span><span class="t5-name">Hadapsar</span><span class="t5-val neg">+44% built</span></div>
+          <div class="t5-row"><span class="t5-rank">3</span><span class="t5-name">Maval taluka</span><span class="t5-val neg">−31% green</span></div>
+          <div class="t5-row"><span class="t5-rank">4</span><span class="t5-name">Kothrud</span><span class="t5-val neg">−29% green</span></div>
+          <div class="t5-row"><span class="t5-rank">5</span><span class="t5-name">Mulshi</span><span class="t5-val pos">+8% forest</span></div>
+        </div>
+
+        <div class="change-overlay">
+          <div class="co-title">PUNE — 2010 TO 2025</div>
+          <div class="co-row"><span class="co-label">Built-up area</span><span class="co-val" style="color:var(--danger)">+38%</span></div>
+          <div class="co-bar"><div class="co-fill" style="width:75%;background:var(--danger)"></div></div>
+          <div class="co-row mt6"><span class="co-label">Vegetation</span><span class="co-val" style="color:var(--danger)">−24%</span></div>
+          <div class="co-bar"><div class="co-fill" style="width:48%;background:var(--danger)"></div></div>
+          <div class="co-row mt6"><span class="co-label">Water bodies</span><span class="co-val" style="color:var(--amber)">−11%</span></div>
+          <div class="co-bar"><div class="co-fill" style="width:22%;background:var(--amber)"></div></div>
+          <div class="co-row mt6"><span class="co-label">Open land</span><span class="co-val" style="color:var(--danger)">−52%</span></div>
+          <div class="co-bar"><div class="co-fill" style="width:100%;background:var(--danger)"></div></div>
+          <div class="co-row mt6"><span class="co-label">Road network</span><span class="co-val" style="color:var(--high)">+67%</span></div>
+          <div class="co-bar"><div class="co-fill" style="width:67%;background:var(--high)"></div></div>
+          <div style="margin-top:9px;font-size:10px;color:var(--tx3)">Bhuvan LULC 2010–2025 · verification needed</div>
+        </div>
+      </div>
+
+      <div class="changing-panel">
+        <div class="rp-label">District-wide change (2010–2025)</div>
+        <div class="chart-wrap-lg"><canvas id="changingBarChart"></canvas></div>
+
+        <div class="divider"></div>
+        <div class="rp-label">Vegetation loss by ward</div>
+        <div class="chart-wrap"><canvas id="wardGreenChart"></canvas></div>
+
+        <div class="divider"></div>
+        <div class="rp-label">What this means for Pune</div>
+        <div class="action-list">
+          <div class="action-item danger">38% growth in built-up area increases surface runoff — direct cause of worsening floods</div>
+          <div class="action-item high">24% vegetation loss reduces evapotranspiration and increases urban heat island intensity</div>
+          <div class="action-item amber">11% loss in water bodies reduces groundwater recharge — long-term water security risk</div>
+          <div class="action-item info">Mulshi and Tamhini areas still gaining forest cover — ecological buffer still intact in west</div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="rp-label">Tree restoration priority</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+            <span style="font-size:11px;flex:1;color:var(--tx)">Hadapsar</span>
+            <div style="height:6px;width:80%;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:92%;background:var(--danger)"></div></div>
+            <span style="font-size:10px;font-family:var(--mono);color:var(--danger)">92</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+            <span style="font-size:11px;flex:1;color:var(--tx)">Kothrud</span>
+            <div style="height:6px;width:80%;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:78%;background:var(--high)"></div></div>
+            <span style="font-size:10px;font-family:var(--mono);color:var(--high)">78</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+            <span style="font-size:11px;flex:1;color:var(--tx)">Pimpri-Chinchwad</span>
+            <div style="height:6px;width:80%;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:71%;background:var(--high)"></div></div>
+            <span style="font-size:10px;font-family:var(--mono);color:var(--high)">71</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+            <span style="font-size:11px;flex:1;color:var(--tx)">Aundh / Baner</span>
+            <div style="height:6px;width:80%;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:62%;background:var(--amber)"></div></div>
+            <span style="font-size:10px;font-family:var(--mono);color:var(--amber)">62</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+            <span style="font-size:11px;flex:1;color:var(--tx)">Camp / Cantonment</span>
+            <div style="height:6px;width:80%;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:44%;background:var(--accent)"></div></div>
+            <span style="font-size:10px;font-family:var(--mono);color:var(--accent)">44</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="year-slider-wrap">
+      <div class="year-marks">
+        <span class="year-mark" onclick="setYear(this)">2010</span>
+        <span class="year-mark" onclick="setYear(this)">2013</span>
+        <span class="year-mark" onclick="setYear(this)">2015</span>
+        <span class="year-mark" onclick="setYear(this)">2018</span>
+        <span class="year-mark" onclick="setYear(this)">2020</span>
+        <span class="year-mark" onclick="setYear(this)">2022</span>
+        <span class="year-mark active" onclick="setYear(this)">2025</span>
+        <span class="year-mark" onclick="setYear(this)" style="color:var(--accent)">Now</span>
+      </div>
+      <div class="year-track">
+        <div class="year-fill"></div>
+        <div class="year-handle"></div>
+      </div>
+    </div>
+
+    <div class="status-strip">
+      <div class="sc"><span class="sc-icon">🏗</span><div class="sc-data"><span class="sc-label">Built-up growth</span><span class="sc-value danger">+38%</span><span class="sc-trend danger">2010–2025</span></div></div>
+      <div class="sc"><span class="sc-icon">🌿</span><div class="sc-data"><span class="sc-label">Vegetation loss</span><span class="sc-value danger">−24%</span><span class="sc-trend danger">since 2010</span></div></div>
+      <div class="sc"><span class="sc-icon">💧</span><div class="sc-data"><span class="sc-label">Water bodies</span><span class="sc-value amber">−11%</span><span class="sc-trend amber">shrinking</span></div></div>
+      <div class="sc"><span class="sc-icon">🛣</span><div class="sc-data"><span class="sc-label">Road network</span><span class="sc-value high">+67%</span><span class="sc-trend" style="color:var(--tx3)">2010–2025</span></div></div>
+      <div class="sc"><span class="sc-icon">🌾</span><div class="sc-data"><span class="sc-label">Open land</span><span class="sc-value danger">−52%</span><span class="sc-trend danger">converted</span></div></div>
+      <div class="sc"><span class="sc-icon">🌳</span><div class="sc-data"><span class="sc-label">Tree cover</span><span class="sc-value danger">31%</span><span class="sc-trend danger">↓ declining</span></div></div>
+      <div class="sc"><span class="sc-icon">🏭</span><div class="sc-data"><span class="sc-label">Industrial zones</span><span class="sc-value high">+29%</span><span class="sc-trend" style="color:var(--tx3)">footprint</span></div></div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+</div>
+
+<!-- REPORT MODAL -->
+<div id="reportModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(24,43,36,0.35);backdrop-filter:blur(3px);align-items:center;justify-content:center">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title">Report an issue</div>
+      <button class="modal-close" onclick="closeReport()">×</button>
+    </div>
+    <div class="form-row"><div class="form-label">Category</div>
+      <select class="form-select"><option>Blocked drain</option><option>Waterlogging</option><option>Garbage dumping</option><option>Road damage</option><option>Water pollution</option><option>Tree / vegetation issue</option></select>
+    </div>
+    <div class="form-row"><div class="form-label">Location</div><input class="form-input" placeholder="Street or landmark"></div>
+    <div class="form-row"><div class="form-label">Description</div><textarea class="form-textarea" placeholder="Describe what you see…"></textarea></div>
+    <div class="form-row"><div class="upload-zone">📷 Add photo</div></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="submitReport()">Submit report</button>
+  </div>
+</div>
+
+<script>
+// ── LIVE CLOCK ──────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const el = document.querySelector('.topbar-time');
+  if (el) {
+    el.textContent = now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false }) + ' IST';
+  }
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── NAVIGATION ──────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('page-' + id);
+  if (target) target.classList.add('active');
+
+  // Sync sidebar tabs
+  const tabMap = { home:'Map', myarea:'My Area', cascade:'Cascade', changing:'Changing' };
+  document.querySelectorAll('.snav-tab').forEach(t => {
+    t.classList.toggle('active', t.textContent.trim() === (tabMap[id]||''));
+  });
+
+  // Sync bottom nav
+  const navMap = { home:'Pune Today', myarea:'My Area', cascade:'Cascade', changing:'Pune Changing' };
+  document.querySelectorAll('.sidebar-footer .nav-item').forEach(n => {
+    const txt = n.textContent.trim().replace(/Active|Online|\d+/g,'').trim();
+    n.classList.toggle('active', txt === (navMap[id]||''));
+  });
+}
+
+function setTab(el) {
+  document.querySelectorAll('.snav-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setNavItem(el) {
+  document.querySelectorAll('.sidebar-footer .nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setMode(el) {
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleSection(head) {
+  const body = head.nextElementSibling;
+  const ch = head.querySelector('.s-section-chevron');
+  if (body && ch) {
+    body.classList.toggle('open');
+    ch.classList.toggle('open');
+  }
+}
+
+function setRadio(el) {
+  el.parentNode.querySelectorAll('.radio-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setPill(el) {
+  document.querySelectorAll('.cpill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setYear(el) {
+  document.querySelectorAll('.year-mark').forEach(m => m.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── REPORT MODAL ────────────────────────────────────────
+function openReport() {
+  const m = document.getElementById('reportModal');
+  if (m) m.style.display = 'flex';
+}
+function closeReport() {
+  const m = document.getElementById('reportModal');
+  if (m) m.style.display = 'none';
+}
+function submitReport() {
+  closeReport();
+  showToast('✓ Report submitted — tracking ID: CIQ-2026-0147');
+}
+
+function showToast(msg) {
+  // Remove any existing toast
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// ── SIMULATE CASCADE ────────────────────────────────────
+let isSimulating = false;
+function simulateCascade() {
+  if (isSimulating) return;
+  isSimulating = true;
+
+  // Flash the map viewport
+  const viewport = document.querySelector('.map-viewport');
+  if (viewport) viewport.classList.add('flash-danger');
+  setTimeout(() => viewport && viewport.classList.remove('flash-danger'), 1200);
+
+  // Show rain overlay
+  const rain = document.querySelector('.rain-overlay');
+  if (rain) rain.classList.add('active');
+
+  // Update topbar alert
+  const pills = document.querySelectorAll('.alert-pill');
+  pills.forEach(p => {
+    if (p.textContent.includes('Flood') || p.textContent.includes('flood') || p.classList.contains('high')) {
+      p.style.background = 'var(--danger-lt)';
+      p.style.color = 'var(--danger)';
+      p.style.borderColor = '#F5C6C2';
+      p.innerHTML = '<span class="apill-dot pulse"></span> EXTREME FLOOD WARNING';
+    }
+  });
+
+  // Update sidebar cascade status
+  const cmProb = document.querySelector('.cm-prob');
+  if (cmProb) { cmProb.textContent = '89%'; cmProb.style.color = 'var(--danger)'; }
+  const cmLabel = document.querySelector('.cm-label');
+  if (cmLabel) cmLabel.textContent = 'Flood probability · CI [0.78–0.95] — CRITICAL';
+  const cmNodes = document.querySelectorAll('.cm-node');
+  cmNodes.forEach(n => {
+    if (n.classList.contains('next')) {
+      n.classList.remove('next');
+      n.classList.add('active');
+    }
+    if (n.classList.contains('active') && n.textContent.includes('Landslide')) {
+      n.classList.remove('active');
+      n.classList.add('done');
+    }
+  });
+
+  // Update status strip flood value
+  const scValues = document.querySelectorAll('.sc-value');
+  scValues.forEach(sv => {
+    const label = sv.closest('.sc')?.querySelector('.sc-label');
+    if (label && label.textContent.includes('Flood')) {
+      sv.textContent = '89%';
+      sv.className = 'sc-value danger';
+    }
+  });
+
+  // Show toast
+  showToast('⚠ Simulation: Extreme rainfall event — cascade chain advancing');
+
+  // Switch to cascade page after 1.5s
+  setTimeout(() => {
+    showPage('cascade');
+  }, 1500);
+
+  // Reset after 12 seconds
+  setTimeout(() => {
+    if (rain) rain.classList.remove('active');
+    isSimulating = false;
+  }, 12000);
+}
+
+// ── CHART DEFAULTS ──────────────────────────────────────
+const C = {
+  font: { family: 'Outfit', size: 11 },
+  monoFont: { family: 'IBM Plex Mono', size: 10 },
+  grid: 'rgba(0,0,0,0.06)',
+  tx3: '#8AADA4',
+};
+const baseOpts = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#fff',
+      borderColor: '#DCE9E3', borderWidth: 1,
+      titleColor: '#182B24', bodyColor: '#4D7066',
+      titleFont: C.font, bodyFont: C.monoFont,
+      padding: 8, cornerRadius: 6,
+      callbacks: {}
+    }
+  },
+  scales: {
+    x: {
+      grid: { color: C.grid, drawBorder: false },
+      ticks: { color: C.tx3, font: C.monoFont }
+    },
+    y: {
+      grid: { color: C.grid, drawBorder: false },
+      ticks: { color: C.tx3, font: C.monoFont },
+      border: { dash: [3,3] }
+    }
+  }
+};
+
+// Sidebar sparkline
+if (document.getElementById('sidebarRain')) {
+  new Chart(document.getElementById('sidebarRain'), {
+    type:'bar',
+    data:{
+      labels:['09','10','11','12','13','14'],
+      datasets:[{
+        data:[18,32,54,68,80,88],
+        backgroundColor:(ctx)=>ctx.raw>70?'rgba(192,86,33,0.7)':ctx.raw>40?'rgba(155,106,0,0.6)':'rgba(26,122,94,0.5)',
+        borderRadius:2
+      }]
+    },
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x,ticks:{...baseOpts.scales.x.ticks}},y:{...baseOpts.scales.y,ticks:{...baseOpts.scales.y.ticks,callback:v=>v+'mm'}}}}
+  });
+}
+
+// Rainfall chart
+if (document.getElementById('rainfallChart')) {
+  new Chart(document.getElementById('rainfallChart'), {
+    type:'bar',
+    data:{
+      labels:['02:00','04:00','06:00','08:00','10:00','12:00','14:00'],
+      datasets:[{
+        data:[8,12,22,38,54,78,88],
+        backgroundColor:(ctx)=>ctx.raw>70?'rgba(192,86,33,0.75)':ctx.raw>40?'rgba(155,106,0,0.65)':'rgba(26,122,94,0.55)',
+        borderRadius:3
+      }]
+    },
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,ticks:{...baseOpts.scales.y.ticks,callback:v=>v+' mm'}}}}
+  });
+}
+
+// AQI chart
+if (document.getElementById('aqiChart')) {
+  new Chart(document.getElementById('aqiChart'), {
+    type:'line',
+    data:{
+      labels:['Sep 28','Sep 29','Sep 30','Oct 01','Oct 02','Oct 03','Oct 04'],
+      datasets:[{
+        data:[78,92,105,88,112,134,118],
+        borderColor:'#9A6A00', backgroundColor:'rgba(155,106,0,0.07)',
+        borderWidth:2, pointRadius:3, pointBackgroundColor:'#9A6A00',
+        fill:true, tension:0.4
+      }]
+    },
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,min:0,max:200}}}
+  });
+}
+
+// Change chart
+if (document.getElementById('changeChart')) {
+  new Chart(document.getElementById('changeChart'), {
+    type:'bar',
+    data:{
+      labels:['2010','2015','2020','2025'],
+      datasets:[
+        {label:'Built-up',   data:[28,35,42,52], backgroundColor:'rgba(192,57,43,0.65)',  borderRadius:2},
+        {label:'Vegetation', data:[48,40,35,31], backgroundColor:'rgba(26,107,58,0.6)',   borderRadius:2},
+        {label:'Water',      data:[10, 9, 8, 7], backgroundColor:'rgba(75,155,192,0.65)', borderRadius:2},
+        {label:'Open land',  data:[14,16,15,10], backgroundColor:'rgba(138,173,164,0.5)', borderRadius:2},
+      ]
+    },
+    options:{...baseOpts,
+      plugins:{...baseOpts.plugins,
+        legend:{display:true,position:'bottom',labels:{color:'#4D7066',font:{family:'Outfit',size:10},boxWidth:10,padding:8}}
+      },
+      scales:{
+        x:{...baseOpts.scales.x,stacked:true},
+        y:{...baseOpts.scales.y,stacked:true,max:100,ticks:{...baseOpts.scales.y.ticks,callback:v=>v+'%'}}
+      }
+    }
+  });
+}
+
+// River chart
+if (document.getElementById('riverChart')) {
+  new Chart(document.getElementById('riverChart'), {
+    type:'line',
+    data:{
+      labels:['08:00','09:00','10:00','11:00','12:00','13:00','14:00'],
+      datasets:[
+        {label:'Mutha',data:[2.1,2.4,2.9,3.4,3.8,4.0,4.2],borderColor:'#C05621',backgroundColor:'rgba(192,86,33,0.06)',borderWidth:2,pointRadius:2,fill:true,tension:0.3},
+        {label:'Mula', data:[1.8,2.0,2.3,2.6,2.8,3.0,3.1],borderColor:'#9A6A00',backgroundColor:'rgba(155,106,0,0.06)',borderWidth:1.5,pointRadius:2,fill:true,tension:0.3},
+      ]
+    },
+    options:{...baseOpts,
+      plugins:{...baseOpts.plugins,legend:{display:true,position:'bottom',labels:{color:'#4D7066',font:{family:'Outfit',size:10},boxWidth:10,padding:6}}},
+      scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,title:{display:true,text:'metres',color:C.tx3,font:{family:'IBM Plex Mono',size:9}}}}
+    }
+  });
+}
+
+// Temp chart
+if (document.getElementById('tempChart')) {
+  new Chart(document.getElementById('tempChart'), {
+    type:'line',
+    data:{
+      labels:['06h','08h','10h','12h','14h','16h','18h','20h','22h'],
+      datasets:[{
+        data:[26,28,31,34,36,35,33,30,27],
+        borderColor:'#9A6A00',backgroundColor:'rgba(155,106,0,0.06)',
+        borderWidth:2,pointRadius:0,fill:true,tension:0.5
+      }]
+    },
+    options:{...baseOpts,scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,ticks:{...baseOpts.scales.y.ticks,callback:v=>v+'°C'}}}}
+  });
+}
+
+// Cascade time chart
+if (document.getElementById('cascadeTimeChart')) {
+  new Chart(document.getElementById('cascadeTimeChart'), {
+    type:'line',
+    data:{
+      labels:['-12h','-10h','-8h','-6h','-4h','-2h','Now','+2h','+4h','+6h'],
+      datasets:[
+        {label:'Flood probability',data:[0.08,0.12,0.18,0.28,0.44,0.58,0.72,0.76,0.71,0.62],borderColor:'#C05621',backgroundColor:'rgba(192,86,33,0.07)',borderWidth:2.5,pointRadius:[2,2,2,2,2,2,5,2,2,2],pointBackgroundColor:(c)=>c.dataIndex===6?'#C05621':'transparent',fill:true,tension:0.4},
+        {label:'Landslide probability',data:[0.04,0.08,0.14,0.24,0.42,0.62,0.74,0.70,0.60,0.48],borderColor:'#C0392B',backgroundColor:'transparent',borderWidth:1.5,borderDash:[4,3],pointRadius:0,tension:0.4},
+        {label:'CI upper',data:[null,null,null,null,null,null,0.84,0.88,0.84,0.76],borderColor:'rgba(192,86,33,0.2)',borderWidth:1,borderDash:[2,4],pointRadius:0,tension:0.4,fill:'+1',backgroundColor:'rgba(192,86,33,0.04)'},
+        {label:'CI lower',data:[null,null,null,null,null,null,0.58,0.62,0.56,0.46],borderColor:'rgba(192,86,33,0.2)',borderWidth:1,borderDash:[2,4],pointRadius:0,tension:0.4},
+      ]
+    },
+    options:{...baseOpts,
+      plugins:{...baseOpts.plugins,legend:{display:true,position:'bottom',labels:{color:'#4D7066',font:{family:'Outfit',size:10},boxWidth:12,padding:10}}},
+      scales:{
+        x:{...baseOpts.scales.x,title:{display:true,text:'Hours relative to now',color:C.tx3,font:{family:'IBM Plex Mono',size:9}}},
+        y:{...baseOpts.scales.y,min:0,max:1,ticks:{...baseOpts.scales.y.ticks,callback:v=>(v*100)+'%'}}
+      }
+    }
+  });
+}
+
+// Changing bar chart
+if (document.getElementById('changingBarChart')) {
+  new Chart(document.getElementById('changingBarChart'), {
+    type:'bar',
+    data:{
+      labels:['Built-up','Vegetation','Water bodies','Open land','Roads'],
+      datasets:[
+        {label:'2010',data:[28,52,12,18,38],backgroundColor:'rgba(138,173,164,0.5)',borderRadius:2},
+        {label:'2025',data:[52,31,8,10,62], backgroundColor:(ctx)=>['rgba(192,57,43,0.7)','rgba(192,57,43,0.65)','rgba(155,106,0,0.6)','rgba(192,57,43,0.65)','rgba(192,86,33,0.65)'][ctx.dataIndex]||'rgba(192,57,43,0.7)',borderRadius:2},
+      ]
+    },
+    options:{...baseOpts,
+      plugins:{...baseOpts.plugins,legend:{display:true,position:'bottom',labels:{color:'#4D7066',font:{family:'Outfit',size:10},boxWidth:10,padding:6}}},
+      scales:{x:{...baseOpts.scales.x},y:{...baseOpts.scales.y,ticks:{...baseOpts.scales.y.ticks,callback:v=>v+'%'}}}
+    }
+  });
+}
+
+// Ward green chart
+if (document.getElementById('wardGreenChart')) {
+  new Chart(document.getElementById('wardGreenChart'), {
+    type:'bar',
+    data:{
+      labels:['Mulshi','Camp','Aundh','Deccan','Kothrud','Pimpri','Hadapsar'],
+      datasets:[{
+        label:'Green cover %',
+        data:[58,42,38,33,29,24,19],
+        backgroundColor:(ctx)=>ctx.raw>=40?'rgba(26,107,58,0.65)':ctx.raw>=30?'rgba(155,106,0,0.65)':'rgba(192,57,43,0.65)',
+        borderRadius:3,
+      }]
+    },
+    options:{...baseOpts,
+      indexAxis:'y',
+      scales:{
+        x:{...baseOpts.scales.x,max:65,ticks:{...baseOpts.scales.x.ticks,callback:v=>v+'%'}},
+        y:{...baseOpts.scales.y}
+      }
+    }
+  });
+}
+
+// Gauges
+function drawGauge(id, val, color) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  const cx = w/2, cy = h*0.9, r = Math.min(w,h*1.6)*0.40;
+
+  // Background arc
+  ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,0);
+  ctx.strokeStyle='rgba(0,0,0,0.08)'; ctx.lineWidth=7; ctx.lineCap='round'; ctx.stroke();
+
+  // Value arc with animation
+  const targetAngle = Math.PI + (Math.PI * val);
+  let currentAngle = Math.PI;
+  function animateGauge() {
+    if (currentAngle >= targetAngle) return;
+    currentAngle = Math.min(currentAngle + 0.05, targetAngle);
+    ctx.clearRect(0,0,w,h);
+    // Background
+    ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,0);
+    ctx.strokeStyle='rgba(0,0,0,0.08)'; ctx.lineWidth=7; ctx.lineCap='round'; ctx.stroke();
+    // Value
+    ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,currentAngle);
+    ctx.strokeStyle=color; ctx.lineWidth=7; ctx.lineCap='round'; ctx.stroke();
+    // Tick marks
+    for(let i=0;i<=10;i++){
+      const a=Math.PI+(Math.PI*i/10);
+      ctx.beginPath();
+      ctx.moveTo(cx+(r-10)*Math.cos(a),cy+(r-10)*Math.sin(a));
+      ctx.lineTo(cx+(r-14)*Math.cos(a),cy+(r-14)*Math.sin(a));
+      ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=1; ctx.stroke();
+    }
+    requestAnimationFrame(animateGauge);
+  }
+  animateGauge();
+}
+
+// Initialize gauges when cascade page becomes visible
+const gaugeObserver = new MutationObserver(() => {
+  const cascadePage = document.getElementById('page-cascade');
+  if (cascadePage && cascadePage.classList.contains('active')) {
+    setTimeout(() => {
+      drawGauge('gaugeFlood', 0.72, '#C05621');
+      drawGauge('gaugeLand', 0.74, '#C0392B');
+    }, 200);
+  }
+});
+const pageContainer = document.querySelector('.main') || document.body;
+gaugeObserver.observe(pageContainer, { subtree:true, attributes:true, attributeFilter:['class'] });
+
+// Also draw on load in case cascade is visible
+drawGauge('gaugeFlood', 0.72, '#C05621');
+drawGauge('gaugeLand', 0.74, '#C0392B');
+
+
+// ── BACKEND INTEGRATION (FastAPI) ──────────────────────
+const BACKEND_URL = 'http://localhost:8000';
+const WS_URL = 'ws://localhost:8000/ws/alerts';
+
+async function fetchCurrentPredictions() {
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/v1/predictions/current?region_id=1`);
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+        
+        if (data && data.length > 0) {
+            const current = data[0];
+            // Update UI with current prediction data
+            console.log("Latest prediction:", current);
+            
+            // Example: update the flood probability gauge if probability exists
+            if (current.probability) {
+                drawGauge('gaugeFlood', current.probability, '#C05621');
+                const cbProb = document.querySelector('.cb-prob');
+                if (cbProb) cbProb.textContent = `Flood P = ${current.probability.toFixed(2)} · Live Model`;
+            }
+        }
+    } catch (err) {
+        console.error("Failed to fetch predictions:", err);
+    }
+}
+
+function connectWebSocket() {
+    const ws = new WebSocket(WS_URL);
+    
+    ws.onopen = () => {
+        console.log("WebSocket connected to backend");
+        showToast("Connected to live alert stream");
+    };
+    
+    ws.onmessage = (event) => {
+        if (event.data === "pong") return;
+        try {
+            const msg = JSON.parse(event.data);
+            console.log("Received alert:", msg);
+            
+            // Show alert pill in topbar
+            const bar = document.querySelector('.topbar .alert-strip');
+            if (bar) {
+                bar.innerHTML = `<div class="alert-pill danger" style="cursor:pointer" onclick="showPage('cascade')">
+                    <span class="apill-dot pulse"></span> ${msg.tier || 'WARNING'}: ${msg.alert_msg || 'Hazard detected'}
+                </div>`;
+            }
+            showToast("New alert received: " + (msg.alert_msg || "Cascade warning"));
+            
+            // Flash map if it's a high tier alert
+            if (msg.tier === 'RED') {
+                const viewport = document.querySelector('.map-viewport');
+                if (viewport) {
+                    viewport.classList.add('flash-danger');
+                    setTimeout(() => viewport.classList.remove('flash-danger'), 1200);
+                }
+            }
+        } catch (e) {
+            console.warn("Could not parse WS message", e);
+        }
+    };
+    
+    ws.onclose = () => {
+        console.log("WebSocket disconnected. Reconnecting in 5s...");
+        setTimeout(connectWebSocket, 5000);
+    };
+    
+    // Heartbeat
+    setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send("ping");
+        }
+    }, 30000);
+}
+
+// Initialize backend connections when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    fetchCurrentPredictions();
+    setInterval(fetchCurrentPredictions, 60000); // refresh every minute
+    connectWebSocket();
+});
+
+
+// ── MAPBOX 3D MAP ───────────────────────────────────────
+const mapboxToken = window.URBANPULSE_MAPBOX_TOKEN;
+if (!mapboxToken) {
+  mapContainerRef.current.textContent = 'Set URBANPULSE_MAPBOX_TOKEN in mapbox-config.js to display the map.';
+  return;
+}
+mapboxgl.accessToken = mapboxToken;
+
+let puneMap = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const mapEl = document.getElementById('map');
+  if (!mapEl) return;
+
+  puneMap = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12', // Absolutely highest resolution imagery available
+    center: [73.8567, 18.5204],
+    zoom: 14, 
+    pitch: 65,
+    bearing: -25,
+    antialias: true
+  });
+
+  puneMap.on('style.load', () => {
+
+    // ── 1. HIGH-RES 3D TERRAIN ──
+    puneMap.addSource('mapbox-dem', {
+      'type': 'raster-dem',
+      'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+      'tileSize': 512, // MUST BE 512 for max clarity
+      'maxzoom': 14
+    });
+    // Moderate exaggeration prevents texture stretching
+    puneMap.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+    
+    // ── 2. RAZOR SHARP 3D BUILDINGS ──
+    puneMap.addLayer({
+      'id': '3d-buildings',
+      'source': 'composite',
+      'source-layer': 'building',
+      'filter': ['==', 'extrude', 'true'],
+      'type': 'fill-extrusion',
+      'minzoom': 14,
+      'paint': {
+        'fill-extrusion-color': '#e0e0e0',
+        'fill-extrusion-height': ['get', 'height'],
+        'fill-extrusion-base': ['get', 'min_height'],
+        'fill-extrusion-opacity': 0.95
+      }
+    });
+
+    // ── 2. GLOWING HAZARD ZONES ──
+    puneMap.addSource('flood-zone', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Sinhagad Corridor', risk: 'Extreme' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[
+                [73.78, 18.36], [73.83, 18.39], [73.86, 18.45],
+                [73.87, 18.52], [73.85, 18.54], [73.82, 18.50],
+                [73.79, 18.44], [73.78, 18.36]
+              ]]
+            }
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Hadapsar Lowlands', risk: 'High' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[
+                [73.92, 18.49], [73.96, 18.50], [73.97, 18.53],
+                [73.94, 18.54], [73.91, 18.52], [73.92, 18.49]
+              ]]
+            }
+          }
+        ]
+      }
+    });
+
+    // Outer glow (blur)
+    puneMap.addLayer({
+      id: 'flood-zone-glow',
+      type: 'fill',
+      source: 'flood-zone',
+      paint: {
+        'fill-color': ['match', ['get', 'risk'], 'Extreme', '#ff003c', 'High', '#ff5900', '#ffb300'],
+        'fill-opacity': 0.15
+      }
+    });
+
+    // Inner bright fill
+    puneMap.addLayer({
+      id: 'flood-zone-fill',
+      type: 'fill',
+      source: 'flood-zone',
+      paint: {
+        'fill-color': ['match', ['get', 'risk'], 'Extreme', '#ff003c', 'High', '#ff5900', '#ffb300'],
+        'fill-opacity': 0.25
+      }
+    });
+
+    // Neon crisp outline
+    puneMap.addLayer({
+      id: 'flood-zone-outline',
+      type: 'line',
+      source: 'flood-zone',
+      paint: {
+        'line-color': ['match', ['get', 'risk'], 'Extreme', '#ff3366', 'High', '#ff8833', '#ffcc33'],
+        'line-width': 3,
+        'line-opacity': 0.9,
+        'line-dasharray': [2, 1]
+      }
+    });
+
+    // ── 3. GLOWING RIVER (Mutha) ──
+    puneMap.addSource('river-line', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [73.76, 18.41], [73.80, 18.46], [73.84, 18.50], [73.86, 18.53], [73.90, 18.55]
+          ]
+        }
+      }
+    });
+    
+    // River glow
+    puneMap.addLayer({
+      id: 'river-glow',
+      type: 'line',
+      source: 'river-line',
+      paint: {
+        'line-color': '#00f0ff',
+        'line-width': 10,
+        'line-blur': 15,
+        'line-opacity': 0.6
+      }
+    });
+    // River core
+    puneMap.addLayer({
+      id: 'river-core',
+      type: 'line',
+      source: 'river-line',
+      paint: {
+        'line-color': '#b3fbff',
+        'line-width': 3,
+        'line-opacity': 0.9
+      }
+    });
+
+    // ── 4. TACTICAL MARKERS ──
+    const markers = [
+      { coords: [73.77, 18.37], color: '#ff003c', label: '⚠ Sinhagad Landslide Risk' },
+      { coords: [73.86, 18.50], color: '#ff5900', label: '🌊 Mutha River Overflow' },
+      { coords: [73.94, 18.51], color: '#ff5900', label: '⚡ Substation Threat' },
+      { coords: [73.76, 18.41], color: '#00f0ff', label: '💧 Khadakwasla Dam' },
+    ];
+
+    markers.forEach(m => {
+      const el = document.createElement('div');
+      el.style.cssText = `width:16px;height:16px;border-radius:50%;border:2px solid #fff;background:${m.color};box-shadow:0 0 15px ${m.color}, 0 0 30px ${m.color};cursor:pointer;`;
+
+      new mapboxgl.Marker({ element: el })
+        .setLngLat(m.coords)
+        .setPopup(new mapboxgl.Popup({ offset: 12, closeButton: false })
+          .setHTML(`<div style="font-family:Outfit;font-size:12px;font-weight:600;padding:2px 4px;color:${m.color}">${m.label}</div>`))
+        .addTo(puneMap);
+    });
+  });
+
+  // ── Coordinate readout ──
+  puneMap.on('mousemove', (e) => {
+    const coordsEl = document.querySelector('.map-coords');
+    if (coordsEl) {
+      coordsEl.textContent = e.lngLat.lat.toFixed(4) + '°N | ' + e.lngLat.lng.toFixed(4) + '°E | Pune Region';
+    }
+  });
+
+  // ── Wire up custom map controls ──
+  const ctrls = document.querySelectorAll('.map-ctrl-btn');
+  ctrls.forEach(btn => {
+    const txt = btn.textContent.trim();
+    if (txt === '+') {
+      btn.onclick = () => puneMap.zoomIn();
+    } else if (txt === '−' || txt === '-') {
+      btn.onclick = () => puneMap.zoomOut();
+    } else if (txt === '⊙') {
+      btn.onclick = () => {
+        puneMap.flyTo({ center: [73.8567, 18.5204], zoom: 12.5, pitch: 65, bearing: -25 });
+        ctrls.forEach(b => b.classList.remove('active'));
+        const btn3d = [...ctrls].find(b => b.textContent.trim() === '3D');
+        if (btn3d) btn3d.classList.add('active');
+      };
+    } else if (txt === '3D') {
+      btn.onclick = () => {
+        ctrls.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        puneMap.easeTo({ pitch: 65, bearing: -25, duration: 800 });
+      };
+    } else if (txt === '2D') {
+      btn.onclick = () => {
+        ctrls.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        puneMap.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+      };
+    }
+  });
+
+  puneMap.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+});
+
+// Override simulateCascade to use Mapbox
+const _origSimulateCascade = typeof simulateCascade === 'function' ? simulateCascade : null;
+function simulateCascade() {
+  if (_origSimulateCascade) _origSimulateCascade();
+
+  // Fly to the danger zone
+  if (puneMap) {
+    puneMap.flyTo({
+      center: [73.83, 18.48],
+      zoom: 14,
+      pitch: 70,
+      bearing: 30,
+      speed: 0.6
+    });
+
+    // Pulse the flood zone red
+    setTimeout(() => {
+      if (puneMap.getLayer('flood-zone-fill')) {
+        puneMap.setPaintProperty('flood-zone-fill', 'fill-color', 'rgba(192,57,43,0.55)');
+        setTimeout(() => {
+          if (puneMap.getLayer('flood-zone-fill')) {
+            puneMap.setPaintProperty('flood-zone-fill', 'fill-color', ['match', ['get', 'risk'],
+              'Extreme', 'rgba(192,57,43,0.35)',
+              'High', 'rgba(192,86,33,0.25)',
+              'rgba(155,106,0,0.15)'
+            ]);
+          }
+        }, 3000);
+      }
+    }, 2000);
+  }
+}
+
+</script>
+</body>
+</html>

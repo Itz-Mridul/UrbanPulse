@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+/mapbox-config.js
+
+**/node_modules/
+**/__pycache__/
+*.py[cod]
+**/venv/
+**/.venv/
+
+**/dist/
+**/.vite/
